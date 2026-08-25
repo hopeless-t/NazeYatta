@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:receipt:0.1",
+  "title": "NazeYatta Preflight Receipt",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task_fingerprint",
+    "policy_bundle_fingerprint",
+    "evaluator_version",
+    "outcome",
+    "findings",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "task_fingerprint": {
+      "type": "string"
+    },
+    "policy_bundle_fingerprint": {
+      "type": "string"
+    },
+    "evaluator_version": {
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "PASS",
+        "CAUTION",
+        "REVIEW",
+        "EVIDENCE_REQUIRED",
+        "BLOCK"
+      ]
+    },
+    "findings": {
+      "type": "array"
+    },
+    "authority_granted": {
+      "const": false
+    }
+  },
+  "additionalProperties": false
+}

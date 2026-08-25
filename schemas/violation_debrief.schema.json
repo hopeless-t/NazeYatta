@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:violation_debrief:0.1",
+  "title": "NazeYatta Violation Debrief",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rule_id",
+    "classification",
+    "actual_action",
+    "root_cause_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "rule_id": {
+      "type": "string"
+    },
+    "classification": {
+      "const": "WORKER_SELF_REPORT"
+    },
+    "intended_goal": {
+      "type": "string"
+    },
+    "understood_rule": {
+      "type": "string"
+    },
+    "actual_action": {
+      "type": "string"
+    },
+    "decision_point": {
+      "type": "string"
+    },
+    "why_action_seemed_acceptable": {
+      "type": "string"
+    },
+    "ignored_or_overridden_signal": {
+      "type": "string"
+    },
+    "pressure_or_goal_conflict": {
+      "type": "string"
+    },
+    "safer_alternative": {
+      "type": "string"
+    },
+    "proposed_prevention": {
+      "type": "string"
+    },
+    "root_cause_status": {
+      "enum": [
+        "SELF_REPORTED",
+        "INFERRED",
+        "EVIDENCE_SUPPORTED",
+        "HUMAN_VALIDATED",
+        "UNRESOLVED"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

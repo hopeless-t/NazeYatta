@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:evidence:0.1",
+  "title": "NazeYatta Evidence Record",
+  "type": "object",
+  "required": [
+    "evidence_id",
+    "supports_claim",
+    "observed_at",
+    "verification"
+  ],
+  "properties": {
+    "evidence_id": {
+      "type": "string"
+    },
+    "supports_claim": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observer": {
+      "type": "object"
+    },
+    "artifact": {
+      "type": "object"
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "VERIFIED",
+            "PRESENT",
+            "STALE",
+            "INVALID",
+            "MISSING",
+            "UNKNOWN"
+          ]
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

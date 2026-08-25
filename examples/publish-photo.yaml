@@ -1,0 +1,18 @@
+task_id: EX-PUBLISH-PHOTO
+action:
+  operation: publish
+  side_effect: external_write
+  externality: public
+worker:
+  required_capability: publish_web_asset
+data:
+  classification: public
+semantics:
+  critical_meaning_complete: true
+evidence:
+  authority_verified: VERIFIED
+  execution_target_verified: VERIFIED
+  worker_capability_qualified: VERIFIED
+  provenance_verified: VERIFIED
+  publication_permission_verified: UNKNOWN
+  evidence_bundle_current: VERIFIED

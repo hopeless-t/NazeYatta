@@ -1,0 +1,16 @@
+task_id: EX-DESTRUCTIVE-DELETE
+action:
+  operation: delete_resource
+  side_effect: destructive
+  externality: internal
+worker:
+  required_capability: process_management
+semantics:
+  critical_meaning_complete: true
+evidence:
+  authority_verified: VERIFIED
+  target_identity_verified: VERIFIED
+  execution_target_verified: VERIFIED
+  worker_capability_qualified: VERIFIED
+  liveness_absence_verified: UNKNOWN
+  evidence_bundle_current: VERIFIED

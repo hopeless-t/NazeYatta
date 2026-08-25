@@ -1,0 +1,141 @@
+policy_bundle:
+  id: nazeyatta-generic-v0.1
+  status: ACTIVE
+  owner: project_policy_owner
+  note: Generic research-grade baseline. Project-specific policy should be layered separately.
+
+rules:
+  - id: NY-AUTH-001
+    title: Action requires explicit authority
+    hazard: ACTION_WITHOUT_AUTHORITY
+    when:
+      all:
+        - field: action.side_effect
+          in: [write, external_write, destructive]
+    requires:
+      - evidence: authority_verified
+        accepted_states: [VERIFIED]
+        reason: Side-effecting action requires explicit authority evidence.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+
+  - id: NY-DESTRUCT-001
+    title: Destructive target must be positively identified
+    hazard: DESTRUCTIVE_ACTION_ON_UNCERTAIN_TARGET
+    when:
+      all:
+        - field: action.side_effect
+          equals: destructive
+    requires:
+      - evidence: target_identity_verified
+        accepted_states: [VERIFIED]
+        reason: Destructive action requires positive target identity.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+
+  - id: NY-LIVE-001
+    title: Unknown liveness cannot authorize takeover or delete
+    hazard: TAKEOVER_OR_DELETE_WITH_UNKNOWN_LIVENESS
+    when:
+      all:
+        - field: action.operation
+          in: [kill, takeover, release_lock, replace_worker, delete_resource]
+    requires:
+      - evidence: liveness_absence_verified
+        accepted_states: [VERIFIED]
+        reason: Failed observation is not proof of absence.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+
+  - id: NY-PUB-001
+    title: External publication requires verified provenance and permission
+    hazard: PUBLICATION_WITH_UNKNOWN_RIGHTS
+    when:
+      all:
+        - field: action.operation
+          equals: publish
+        - field: action.externality
+          equals: public
+    requires:
+      - evidence: provenance_verified
+        accepted_states: [VERIFIED]
+        reason: Published material requires known provenance.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+      - evidence: publication_permission_verified
+        accepted_states: [VERIFIED]
+        reason: Permission Unknown != Permission Granted.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+
+  - id: NY-DATA-001
+    title: Private or customer data may not cross a boundary implicitly
+    hazard: PRIVATE_DATA_BOUNDARY_CROSSING
+    when:
+      all:
+        - field: data.classification
+          in: [private, customer, confidential]
+        - field: action.externality
+          equals: public
+    requires:
+      - evidence: data_release_authorized
+        accepted_states: [VERIFIED]
+        reason: Public Local Data != Private Business Data.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+
+  - id: NY-SECRET-001
+    title: Secrets require protected handling
+    hazard: SECRET_EXPOSURE
+    when:
+      all:
+        - field: data.classification
+          equals: secret
+    requires:
+      - evidence: secret_handling_verified
+        accepted_states: [VERIFIED]
+        reason: Credentials and secrets require protected handling.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+
+  - id: NY-CAP-001
+    title: Required capability must be qualified, not merely declared
+    hazard: UNQUALIFIED_CAPABILITY_USE
+    when:
+      all:
+        - field: worker.required_capability
+          exists: true
+    requires:
+      - evidence: worker_capability_qualified
+        accepted_states: [VERIFIED]
+        reason: Declared Capability != Qualified Capability.
+        "on": {unknown: REVIEW, missing: REVIEW, stale: REVIEW, invalid: BLOCK, default: REVIEW}
+
+  - id: NY-TARGET-001
+    title: Environment, branch, or resource identity must be explicit
+    hazard: TARGET_MISIDENTIFICATION
+    when:
+      all:
+        - field: action.side_effect
+          in: [write, external_write, destructive]
+    requires:
+      - evidence: execution_target_verified
+        accepted_states: [VERIFIED]
+        reason: Side effects require explicit target identity.
+        "on": {unknown: BLOCK, missing: BLOCK, stale: BLOCK, invalid: BLOCK, default: BLOCK}
+
+  - id: NY-EVID-001
+    title: Required evidence must be current and provenance-linked
+    hazard: STALE_OR_UNVERIFIED_EVIDENCE
+    when:
+      all:
+        - field: action.side_effect
+          in: [external_write, destructive]
+    requires:
+      - evidence: evidence_bundle_current
+        accepted_states: [VERIFIED]
+        reason: Verified At Time T != Currently Verified.
+        "on": {unknown: EVIDENCE_REQUIRED, missing: EVIDENCE_REQUIRED, stale: EVIDENCE_REQUIRED, invalid: BLOCK, default: EVIDENCE_REQUIRED}
+
+  - id: NY-SEM-001
+    title: Missing critical meaning requires clarification
+    hazard: UNSAFE_UNDERSPECIFICATION
+    when:
+      all:
+        - field: semantics.critical_meaning_complete
+          equals: false
+    effect: REVIEW
+    reason: Missing Meaning != Permission to Guess.

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:task:0.1",
+  "title": "NazeYatta Task",
+  "type": "object",
+  "required": [
+    "task_id",
+    "action",
+    "semantics",
+    "evidence"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "operation",
+        "side_effect",
+        "externality"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "side_effect": {
+          "enum": [
+            "none",
+            "write",
+            "external_write",
+            "destructive"
+          ]
+        },
+        "externality": {
+          "enum": [
+            "internal",
+            "public"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "worker": {
+      "type": "object"
+    },
+    "data": {
+      "type": "object"
+    },
+    "semantics": {
+      "type": "object",
+      "required": [
+        "critical_meaning_complete"
+      ],
+      "properties": {
+        "critical_meaning_complete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}
