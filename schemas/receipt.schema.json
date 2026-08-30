@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:nazeyatta:schema:receipt:0.1",
+  "$id": "urn:nazeyatta:schema:receipt:0.2",
   "title": "NazeYatta Preflight Receipt",
   "type": "object",
   "required": [
@@ -10,7 +10,8 @@
     "evaluator_version",
     "outcome",
     "findings",
-    "authority_granted"
+    "authority_granted",
+    "evidence_lane"
   ],
   "properties": {
     "schema_version": {
@@ -39,6 +40,12 @@
     },
     "authority_granted": {
       "const": false
+    },
+    "evidence_lane": {
+      "enum": [
+        "legacy-v0.1",
+        "provenance-v0.2"
+      ]
     }
   },
   "additionalProperties": false

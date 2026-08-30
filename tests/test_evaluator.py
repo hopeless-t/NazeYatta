@@ -1,4 +1,8 @@
+import json
+from dataclasses import asdict
 from pathlib import Path
+
+import pytest
 
 from nazeyatta.evaluator import evaluate, load_yaml
 
@@ -34,6 +38,15 @@ def test_deterministic_receipt_fingerprints():
     assert a.task_fingerprint == b.task_fingerprint
     assert a.policy_bundle_fingerprint == b.policy_bundle_fingerprint
     assert a.findings == b.findings
+
+
+def test_emitted_receipt_matches_receipt_schema_properties():
+    receipt = asdict(evaluate(load_yaml(ROOT / "examples/safe-read.yaml"), POLICIES))
+    schema = json.loads((ROOT / "schemas/receipt.schema.json").read_text(encoding="utf-8"))
+    assert schema["$id"] == "urn:nazeyatta:schema:receipt:0.2"
+    assert set(receipt) == set(schema["required"])
+    assert set(receipt) <= set(schema["properties"])
+    assert receipt["schema_version"] == "0.2"
 
 
 def test_packaged_policy_matches_public_policy():
@@ -100,6 +113,22 @@ def test_v02_unknown_or_non_normalized_state_does_not_pass():
     result = evaluate(task, POLICIES)
     assert result.outcome == "BLOCK"
     assert result.findings[0]["evidence_state"] == "INVALID"
+
+
+def test_v02_invalid_timestamp_is_not_provenance_qualified():
+    task = v02_safe_read()
+    task["evidence_records"]["EV-CAP-001"]["observed_at"] = "banana"
+    result = evaluate(task, POLICIES)
+    assert result.outcome == "BLOCK"
+    assert result.findings[0]["evidence_state"] == "INVALID"
+
+
+@pytest.mark.parametrize("schema_version", ["0.3", "banana", 3])
+def test_unsupported_explicit_schema_version_is_rejected(schema_version):
+    task = load_yaml(ROOT / "examples/safe-read.yaml")
+    task["schema_version"] = schema_version
+    with pytest.raises(ValueError, match="unsupported schema_version"):
+        evaluate(task, POLICIES)
 
 
 def test_legacy_scalar_lane_is_compatible_but_not_provenance_qualified():

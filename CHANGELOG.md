@@ -6,6 +6,8 @@
 - keep v0.1 scalar evidence as an explicit, receipt-visible legacy compatibility lane
 - treat missing, malformed, mismatched, or non-normalized v0.2 records conservatively as `MISSING` or `INVALID`
 - retain the invariant that evidence resolution never grants execution authority
+- reject unsupported explicit task schema versions instead of falling back to legacy input
+- align the receipt schema with emitted v0.2 receipts and validate provenance timestamps conservatively
 
 ## 0.1.0a1 — 2026-08-25
 

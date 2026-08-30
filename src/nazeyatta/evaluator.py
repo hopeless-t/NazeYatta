@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, asdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -89,10 +90,23 @@ def _rule_matches(task: dict[str, Any], rule: dict[str, Any]) -> bool:
 
 
 def _evidence_lane(task: dict[str, Any]) -> str:
-    """Select the explicit v0.2 provenance lane; all other inputs are legacy v0.1."""
+    """Select a supported input lane without silently downgrading explicit versions."""
     if task.get("schema_version") == "0.2":
         return "provenance-v0.2"
-    return "legacy-v0.1"
+    if task.get("schema_version") in (None, "0.1"):
+        return "legacy-v0.1"
+    raise ValueError(f"unsupported schema_version: {task.get('schema_version')!r}")
+
+
+def _is_offset_datetime(value: Any) -> bool:
+    """Accept ISO-8601 date-times with a timezone using only the standard library."""
+    if not isinstance(value, str) or "T" not in value:
+        return False
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        return datetime.fromisoformat(normalized).tzinfo is not None
+    except ValueError:
+        return False
 
 
 def _v02_effective_state(
@@ -116,8 +130,8 @@ def _v02_effective_state(
         return "INVALID", "evidence_id must match its evidence_records map key"
     if record.get("supports_claim") != claim_key:
         return "INVALID", f"supports_claim must equal {claim_key!r}"
-    if not isinstance(record.get("observed_at"), str) or not record["observed_at"]:
-        return "INVALID", "observed_at is required for provenance-qualified evidence"
+    if not _is_offset_datetime(record.get("observed_at")):
+        return "INVALID", "observed_at must be an ISO-8601 date-time with a timezone"
     observer = record.get("observer")
     if not isinstance(observer, dict) or not isinstance(observer.get("type"), str) or not observer["type"]:
         return "INVALID", "observer.type is required for provenance-qualified evidence"
@@ -184,7 +198,7 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
             outcome = finding.effect
 
     return Receipt(
-        schema_version="0.1",
+        schema_version="0.2",
         task_fingerprint=stable_hash({k: v for k, v in task.items() if k != "receipt"}),
         policy_bundle_fingerprint=stable_hash(policies),
         evaluator_version=evaluator_version,

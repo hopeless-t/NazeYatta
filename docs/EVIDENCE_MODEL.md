@@ -12,11 +12,11 @@ supports_claim: target_branch_is_expected
 kind: external_observation
 artifact:
   remote_sha: b2ef43f...
-  observed_at: "2026-08-25T16:40:00+09:00"
+observed_at: "2026-08-25T16:40:00+09:00"
 observer:
   type: github_api
 verification:
-      state: VERIFIED
+  state: VERIFIED
 ```
 
 ## v0.2 task-reference lane
@@ -36,6 +36,8 @@ evidence_records:
 ```
 
 For a policy-required claim the evaluator requires the referenced record to exist, have the matching `evidence_id`, support that same claim, contain an observation time and observer type, and use one of the canonical uppercase states. It then uses that state as the effective state. Missing references are `MISSING`; malformed or mismatched records are `INVALID`.
+
+The evaluator performs a small standard-library check for `observed_at`: it must be an ISO-8601 date-time with `T` and a timezone (for example `2026-08-25T16:40:00+09:00` or a `Z` suffix). It does not prove that the timestamp or observer is truthful.
 
 This checks input linkage, not real-world identity or authority:
 
