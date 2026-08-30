@@ -11,6 +11,14 @@
 
 It makes a small set of task-relevant rules and hazards explicit before action, evaluates mechanically checkable requirements against supplied evidence, and preserves a structured debrief path when observed behavior violates the rule.
 
+## v0.1-alpha at a glance
+
+**Implemented now:** deterministic YAML preflight evaluation, an explicit evidence-state model, conservative CLI exit statuses, receipt fingerprints, and a structured violation-debrief template.
+
+**Deliberately not implemented yet:** task-YAML generation, provenance adapters, runtime observation, live-trace violation detection, or automatic enforcement. In particular, supplied YAML is evaluated; NazeYatta does **not** authorize who may assert a `VERIFIED` value. That input/evidence-provenance boundary is tracked as [research/design Issue #2](https://github.com/hopeless-t/NazeYatta/issues/2), not a known runtime failure of the current evaluator.
+
+This is an alpha research tool, not a certification, adoption claim, or authority-granting system.
+
 ```text
 👈😽  "I noticed the hazard."
         !=

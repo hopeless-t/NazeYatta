@@ -11,6 +11,14 @@
 
 作業前に今回重要なルールと危険を少数だけ前景化し、機械的に確認できる要求はEvidenceと照合し、違反が観測されたら「なぜやった？」から始まるStructured Debriefへつなげます。
 
+## v0.1-alpha：最初に分かること
+
+**現在実装済み：** deterministic YAML preflight evaluation、明示的なEvidence State model、保守的なCLI exit status、receipt fingerprint、structured violation-debrief template。
+
+**意図的に未実装：** task YAMLの生成、provenance adapter、runtime observation、live traceとのviolation detection、automatic enforcement。特に、NazeYattaは与えられたYAMLを評価しますが、誰が`VERIFIED`をassertしてよいかをauthorizeするものではありません。このinput / evidence provenanceの境界は、現行evaluatorのruntime failureではなく、[research / design Issue #2](https://github.com/hopeless-t/NazeYatta/issues/2)として追跡しています。
+
+これはalpha段階のresearch toolです。Certification・導入実績・authority granting systemを主張するものではありません。
+
 ```text
 👈😽  「この危険を認識しました」
         !=
