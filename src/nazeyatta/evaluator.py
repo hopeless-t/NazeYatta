@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +17,18 @@ OUTCOME_RANK = {
     "BLOCK": 4,
 }
 
+# Effects a policy may assign to a *failed* requirement or an applicable rule.
+# "PASS" is deliberately excluded: a policy must not be able to convert missing,
+# stale, or invalid evidence into a pass (that would be a fail-open configuration).
+POLICY_EFFECTS = {"CAUTION", "REVIEW", "EVIDENCE_REQUIRED", "BLOCK"}
+
 EVIDENCE_STATES = {"VERIFIED", "PRESENT", "STALE", "INVALID", "MISSING", "UNKNOWN"}
+
+EVIDENCE_LANES = ("legacy-v0.1", "provenance-v0.2")
+
+
+class PolicyError(ValueError):
+    """The policy bundle is malformed. Raised instead of silently weakening a rule."""
 
 
 @dataclass(frozen=True)
@@ -51,8 +62,26 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
     return data
 
 
+def _json_default(value: Any) -> str:
+    # YAML parses unquoted timestamps/dates into datetime objects. Fingerprints must
+    # stay deterministic for such inputs instead of crashing with a TypeError.
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    raise TypeError(f"unsupported value in fingerprint payload: {type(value).__name__}")
+
+
+def _canonical(value: Any) -> Any:
+    # Mapping keys become strings so that sort_keys cannot fail on mixed key types
+    # (an unquoted YAML `on:` key is the boolean True, `1:` is an int, ...).
+    if isinstance(value, dict):
+        return {str(k): _canonical(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_canonical(v) for v in value]
+    return value
+
+
 def stable_hash(value: Any) -> str:
-    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(_canonical(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=_json_default)
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -66,6 +95,8 @@ def _get(data: dict[str, Any], dotted: str) -> Any:
 
 
 def _condition_matches(task: dict[str, Any], cond: dict[str, Any]) -> bool:
+    if not isinstance(cond, dict) or "field" not in cond:
+        raise PolicyError(f"condition must be a mapping with a 'field': {cond!r}")
     field = cond["field"]
     actual = _get(task, field)
     if "equals" in cond:
@@ -73,20 +104,52 @@ def _condition_matches(task: dict[str, Any], cond: dict[str, Any]) -> bool:
     if "not_equals" in cond:
         return actual != cond["not_equals"]
     if "in" in cond:
-        return actual in cond["in"]
+        allowed = cond["in"]
+        if isinstance(allowed, (str, bytes)) or not isinstance(allowed, (list, tuple, set)):
+            # `in: write` would otherwise do substring matching against a string.
+            raise PolicyError(f"'in' for field {field!r} must be a list, got {type(allowed).__name__}")
+        return actual in allowed
     if "exists" in cond:
         exists = actual is not None
         return exists is bool(cond["exists"])
-    raise ValueError(f"unsupported condition: {cond}")
+    raise PolicyError(f"unsupported condition: {cond}")
 
 
 def _rule_matches(task: dict[str, Any], rule: dict[str, Any]) -> bool:
     when = rule.get("when", {})
+    if not isinstance(when, dict):
+        raise PolicyError(f"rule {rule.get('id')!r}: 'when' must be a mapping")
+    unknown = set(when) - {"all", "any"}
+    if unknown:
+        # A typo such as `alll:` must not silently turn the rule into "applies to everything".
+        raise PolicyError(f"rule {rule.get('id')!r}: unsupported selector(s) {sorted(unknown)!r} in 'when'")
     if "all" in when:
         return all(_condition_matches(task, c) for c in when["all"])
     if "any" in when:
         return any(_condition_matches(task, c) for c in when["any"])
     return True
+
+
+def _policy_effect(rule_id: Any, value: Any, where: str) -> str:
+    if not isinstance(value, str) or value not in POLICY_EFFECTS:
+        raise PolicyError(
+            f"rule {rule_id!r}: {where} effect must be one of {sorted(POLICY_EFFECTS)}, got {value!r}"
+        )
+    return value
+
+
+def _effect_map(rule_id: Any, req: dict[str, Any]) -> dict[str, Any]:
+    if "on" in req:
+        effect_map = req["on"]
+    elif True in req:
+        # YAML 1.1 parses an unquoted `on:` key as the boolean True. Accept it instead of
+        # silently dropping the whole map (which would weaken BLOCK to the default effect).
+        effect_map = req[True]
+    else:
+        effect_map = {}
+    if not isinstance(effect_map, dict):
+        raise PolicyError(f"rule {rule_id!r}: 'on' must be a mapping of evidence state -> effect")
+    return effect_map
 
 
 def _evidence_lane(task: dict[str, Any]) -> str:
@@ -100,6 +163,9 @@ def _evidence_lane(task: dict[str, Any]) -> str:
 
 def _is_offset_datetime(value: Any) -> bool:
     """Accept ISO-8601 date-times with a timezone using only the standard library."""
+    if isinstance(value, datetime):
+        # An unquoted YAML timestamp is already parsed; it still needs a timezone.
+        return value.tzinfo is not None
     if not isinstance(value, str) or "T" not in value:
         return False
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
@@ -149,14 +215,22 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
 
     lane = _evidence_lane(task)
     evidence_records = task.get("evidence_records")
+    rules = policies.get("rules", [])
+    if not isinstance(rules, list):
+        raise PolicyError("'rules' must be a list")
     findings: list[Finding] = []
-    for rule in policies.get("rules", []):
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise PolicyError(f"rule must be a mapping, got {type(rule).__name__}")
+        missing = [k for k in ("id", "title", "hazard") if k not in rule]
+        if missing:
+            raise PolicyError(f"rule {rule.get('id')!r}: missing required key(s) {missing}")
         if not _rule_matches(task, rule):
             continue
 
         requires = rule.get("requires", [])
         if not requires:
-            effect = rule.get("effect", "CAUTION")
+            effect = _policy_effect(rule["id"], rule.get("effect", "CAUTION"), "'effect'")
             findings.append(Finding(
                 rule_id=rule["id"],
                 title=rule["title"],
@@ -169,6 +243,8 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
             continue
 
         for req in requires:
+            if not isinstance(req, dict) or "evidence" not in req:
+                raise PolicyError(f"rule {rule['id']!r}: each 'requires' entry needs an 'evidence' key")
             key = req["evidence"]
             if lane == "provenance-v0.2":
                 state, resolution_error = _v02_effective_state(evidence, evidence_records, key)
@@ -180,8 +256,12 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
             accepted = {s.upper() for s in req.get("accepted_states", ["VERIFIED"])}
             if state in accepted:
                 continue
-            effect_map = req.get("on", {})
-            effect = effect_map.get(state.lower(), effect_map.get("default", "EVIDENCE_REQUIRED"))
+            effect_map = _effect_map(rule["id"], req)
+            effect = _policy_effect(
+                rule["id"],
+                effect_map.get(state.lower(), effect_map.get("default", "EVIDENCE_REQUIRED")),
+                f"'on' ({state.lower()})",
+            )
             findings.append(Finding(
                 rule_id=rule["id"],
                 title=rule["title"],

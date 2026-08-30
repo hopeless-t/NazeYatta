@@ -74,7 +74,9 @@ nazeyatta check examples/provenance-claim-mismatch.yaml
 nazeyatta debrief-template NY-LIVE-001
 ```
 
-`0` means `PASS`. `CAUTION`, `REVIEW`, `EVIDENCE_REQUIRED`, and `BLOCK` return a non-zero exit status.
+`0` means `PASS`. `CAUTION`, `REVIEW`, `EVIDENCE_REQUIRED`, and `BLOCK` return exit status `2`. A malformed task or policy bundle (including a fail-open policy that tries to map missing evidence to `PASS`) returns exit status `3` with `INVALID INPUT`; it is never a `PASS`.
+
+Integrations that must not accept legacy scalar evidence can add `--require-lane provenance-v0.2`; a task that resolves to `legacy-v0.1` then exits `2` with `LANE MISMATCH`.
 
 ### v0.2 provenance input
 
