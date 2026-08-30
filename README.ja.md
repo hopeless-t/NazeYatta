@@ -15,7 +15,9 @@
 
 **現在実装済み：** deterministic YAML preflight evaluation、明示的なEvidence State model、保守的なCLI exit status、receipt fingerprint、structured violation-debrief template。
 
-**意図的に未実装：** task YAMLの生成、provenance adapter、runtime observation、live traceとのviolation detection、automatic enforcement。特に、NazeYattaは与えられたYAMLを評価しますが、誰が`VERIFIED`をassertしてよいかをauthorizeするものではありません。このinput / evidence provenanceの境界は、現行evaluatorのruntime failureではなく、[research / design Issue #2](https://github.com/hopeless-t/NazeYatta/issues/2)として追跡しています。
+**v0.2 provenance input lane：** `schema_version: "0.2"` では、既存policy keyを変えずに `task.evidence` のclaim keyからEvidence Record IDを参照し、`evidence_records` の `evidence_id`、`supports_claim`、`observed_at`、`observer.type`、正規化済み `verification.state` を保守的に解決する。欠落は`MISSING`、不整合は`INVALID`であり、勝手に`VERIFIED`にはならない。旧v0.1のscalar evidenceも互換性のため残るが、receiptでは`legacy-v0.1`と表示され、provenance-qualified evidenceではない。
+
+**意図的に未実装：** task YAMLの生成、provenance adapter、runtime observation、live traceとのviolation detection、automatic enforcement。NazeYattaはrecord形状・claim linkを評価するが、誰が`VERIFIED`をassertしてよいかをauthenticate/authorizeするものではありません。
 
 これはalpha段階のresearch toolです。Certification・導入実績・authority granting systemを主張するものではありません。
 

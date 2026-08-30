@@ -11,6 +11,7 @@
 
 ## v0.2 candidates
 
+- implemented alpha input lane: claim-to-Evidence-Record references with conservative effective-state resolution
 - JSON Schema validation on CLI input
 - explicit policy provenance metadata
 - reusable receipt JSON files

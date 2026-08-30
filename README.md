@@ -11,11 +11,11 @@
 
 It makes a small set of task-relevant rules and hazards explicit before action, evaluates mechanically checkable requirements against supplied evidence, and preserves a structured debrief path when observed behavior violates the rule.
 
-## v0.1-alpha at a glance
+## v0.1-alpha with the v0.2 provenance-input lane
 
-**Implemented now:** deterministic YAML preflight evaluation, an explicit evidence-state model, conservative CLI exit statuses, receipt fingerprints, and a structured violation-debrief template.
+**Implemented now:** deterministic YAML preflight evaluation, an explicit evidence-state model, conservative CLI exit statuses, receipt fingerprints, a structured violation-debrief template, and a small v0.2 provenance-input lane.
 
-**Deliberately not implemented yet:** task-YAML generation, provenance adapters, runtime observation, live-trace violation detection, or automatic enforcement. In particular, supplied YAML is evaluated; NazeYatta does **not** authorize who may assert a `VERIFIED` value. That input/evidence-provenance boundary is tracked as [research/design Issue #2](https://github.com/hopeless-t/NazeYatta/issues/2), not a known runtime failure of the current evaluator.
+**Deliberately not implemented yet:** task-YAML generation, provenance adapters, runtime observation, live-trace violation detection, or automatic enforcement. NazeYatta resolves supplied v0.2 records deterministically; it does **not** authenticate the observer or authorize who may assert `VERIFIED`.
 
 This is an alpha research tool, not a certification, adoption claim, or authority-granting system.
 
@@ -69,10 +69,37 @@ python -m pip install -e .
 nazeyatta check examples/safe-read.yaml
 nazeyatta check examples/publish-photo.yaml
 nazeyatta check examples/destructive-delete.yaml
+nazeyatta check examples/provenance-qualified-safe-read.yaml
+nazeyatta check examples/provenance-claim-mismatch.yaml
 nazeyatta debrief-template NY-LIVE-001
 ```
 
 `0` means `PASS`. `CAUTION`, `REVIEW`, `EVIDENCE_REQUIRED`, and `BLOCK` return a non-zero exit status.
+
+### v0.2 provenance input
+
+Legacy v0.1 task files remain supported: `task.evidence` values are scalar states such as `VERIFIED`. Their receipts say `evidence_lane: legacy-v0.1`; compatibility does **not** turn those scalar assertions into provenance-qualified Evidence Records.
+
+Use `schema_version: "0.2"` for the provenance lane. `task.evidence` maps the unchanged policy claim keys to record IDs, and `evidence_records` holds the records:
+
+```yaml
+schema_version: "0.2"
+evidence:
+  authority_verified: EV-AUTH-001
+evidence_records:
+  EV-AUTH-001:
+    evidence_id: EV-AUTH-001
+    supports_claim: authority_verified
+    observed_at: "2026-08-30T00:00:00+09:00"
+    observer:
+      type: human_or_adapter
+    artifact:
+      ref: review-record-123
+    verification:
+      state: VERIFIED
+```
+
+For every policy-required claim, v0.2 resolves `task.evidence[claim] → evidence_records[id] → verification.state`. A missing record is `MISSING`; a wrong ID, claim, observer, time, state, or record shape is `INVALID`; an allowed canonical state is used as-is. Only the policy decides whether that effective state passes. A malformed or unqualified record never silently becomes `VERIFIED`.
 
 ## How it works
 
@@ -168,6 +195,10 @@ KY Completed != Authority to Execute
 KY PASS != Authority Granted
 Unknown != Safe
 Worker Self-Declaration != Evidence
+Document Author != Field Authority
+Producer Identity != Evidence Authority
+Provenance Present != Authority Proven
+Evidence VERIFIED != Execution Authority
 Artifact != Evidence
 Familiar Task != Same State
 Past Success != Current Safety
@@ -187,6 +218,7 @@ Generative discovery may widen attention. It may never narrow authoritative requ
 - deterministic YAML rule evaluation where mechanically enforceable;
 - generic 10-rule baseline policy bundle;
 - explicit evidence-state handling;
+- v0.2 Evidence Record reference resolution (with explicit v0.1 compatibility receipts);
 - deterministic task/policy fingerprints in preflight receipts;
 - conservative CLI exit status (`0` only for `PASS`);
 - structured Naze-Yatta debrief template;
@@ -205,7 +237,7 @@ See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Evidence, authority, and completion
 
-NazeYatta treats a useful evidence record as something that binds **what is claimed**, **what was observed**, and **where that observation came from**, with relevant time/state context. See [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md).
+NazeYatta treats a useful evidence record as something that binds **what is claimed**, **what was observed**, and **where that observation came from**, with relevant time/state context. The v0.2 lane checks record shape and claim linkage, but it does not prove the observer's real-world authority. See [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md).
 
 A `PASS` never manufactures authority:
 

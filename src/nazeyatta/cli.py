@@ -36,6 +36,7 @@ def print_receipt(receipt) -> None:
         print(f"  reason: {f['reason']}")
         print()
     print("EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA")
+    print(f"evidence_lane: {receipt.evidence_lane}")
     print(f"task_fingerprint: {receipt.task_fingerprint}")
     print(f"policy_bundle_fingerprint: {receipt.policy_bundle_fingerprint}")
 

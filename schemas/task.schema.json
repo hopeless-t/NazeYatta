@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:nazeyatta:schema:task:0.1",
+  "$id": "urn:nazeyatta:schema:task:0.2",
   "title": "NazeYatta Task",
   "type": "object",
   "required": [
@@ -10,6 +10,9 @@
     "evidence"
   ],
   "properties": {
+    "schema_version": {
+      "enum": ["0.1", "0.2"]
+    },
     "task_id": {
       "type": "string",
       "minLength": 1
@@ -64,7 +67,24 @@
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "evidence_records": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "evidence.schema.json"
+      }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"schema_version": {"const": "0.2"}},
+        "required": ["schema_version"]
+      },
+      "then": {
+        "required": ["evidence_records"]
+      }
+    }
+  ],
   "additionalProperties": true
 }

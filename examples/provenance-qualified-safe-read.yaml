@@ -1,0 +1,23 @@
+schema_version: "0.2"
+task_id: EX-V02-SAFE-READ
+action:
+  operation: read
+  side_effect: none
+  externality: internal
+worker:
+  required_capability: read_repository
+semantics:
+  critical_meaning_complete: true
+evidence:
+  worker_capability_qualified: EV-CAP-001
+evidence_records:
+  EV-CAP-001:
+    evidence_id: EV-CAP-001
+    supports_claim: worker_capability_qualified
+    observed_at: "2026-08-30T00:00:00+09:00"
+    observer:
+      type: human_or_adapter
+    artifact:
+      ref: local-capability-assessment
+    verification:
+      state: VERIFIED

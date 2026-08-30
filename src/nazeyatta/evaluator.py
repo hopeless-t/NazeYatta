@@ -16,6 +16,8 @@ OUTCOME_RANK = {
     "BLOCK": 4,
 }
 
+EVIDENCE_STATES = {"VERIFIED", "PRESENT", "STALE", "INVALID", "MISSING", "UNKNOWN"}
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -37,6 +39,7 @@ class Receipt:
     outcome: str
     findings: list[dict[str, Any]]
     authority_granted: bool
+    evidence_lane: str
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -85,11 +88,53 @@ def _rule_matches(task: dict[str, Any], rule: dict[str, Any]) -> bool:
     return True
 
 
+def _evidence_lane(task: dict[str, Any]) -> str:
+    """Select the explicit v0.2 provenance lane; all other inputs are legacy v0.1."""
+    if task.get("schema_version") == "0.2":
+        return "provenance-v0.2"
+    return "legacy-v0.1"
+
+
+def _v02_effective_state(
+    evidence: dict[str, Any], evidence_records: Any, claim_key: str
+) -> tuple[str, str | None]:
+    """Resolve a v0.2 claim reference without treating malformed provenance as verified."""
+    reference = evidence.get(claim_key)
+    if reference is None:
+        return "MISSING", "no Evidence Record ID was supplied"
+    if not isinstance(reference, str) or not reference:
+        return "INVALID", "Evidence Record ID must be a non-empty string"
+    if not isinstance(evidence_records, dict):
+        return "INVALID", "evidence_records must be a mapping in schema_version 0.2"
+
+    record = evidence_records.get(reference)
+    if record is None:
+        return "MISSING", f"referenced Evidence Record {reference!r} does not exist"
+    if not isinstance(record, dict):
+        return "INVALID", f"Evidence Record {reference!r} must be a mapping"
+    if record.get("evidence_id") != reference:
+        return "INVALID", "evidence_id must match its evidence_records map key"
+    if record.get("supports_claim") != claim_key:
+        return "INVALID", f"supports_claim must equal {claim_key!r}"
+    if not isinstance(record.get("observed_at"), str) or not record["observed_at"]:
+        return "INVALID", "observed_at is required for provenance-qualified evidence"
+    observer = record.get("observer")
+    if not isinstance(observer, dict) or not isinstance(observer.get("type"), str) or not observer["type"]:
+        return "INVALID", "observer.type is required for provenance-qualified evidence"
+    verification = record.get("verification")
+    state = verification.get("state") if isinstance(verification, dict) else None
+    if not isinstance(state, str) or state not in EVIDENCE_STATES:
+        return "INVALID", "verification.state must be an allowed, uppercase evidence state"
+    return state, None
+
+
 def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: str = "0.1.0a1") -> Receipt:
     evidence = task.get("evidence", {})
     if not isinstance(evidence, dict):
         raise ValueError("task.evidence must be a mapping")
 
+    lane = _evidence_lane(task)
+    evidence_records = task.get("evidence_records")
     findings: list[Finding] = []
     for rule in policies.get("rules", []):
         if not _rule_matches(task, rule):
@@ -111,7 +156,13 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
 
         for req in requires:
             key = req["evidence"]
-            state = str(evidence.get(key, "UNKNOWN")).upper()
+            if lane == "provenance-v0.2":
+                state, resolution_error = _v02_effective_state(evidence, evidence_records, key)
+            else:
+                # v0.1 remains accepted for compatibility, but these scalar assertions are
+                # not provenance-qualified Evidence Records.
+                state = str(evidence.get(key, "UNKNOWN")).upper()
+                resolution_error = None
             accepted = {s.upper() for s in req.get("accepted_states", ["VERIFIED"])}
             if state in accepted:
                 continue
@@ -124,7 +175,7 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
                 evidence_key=key,
                 evidence_state=state,
                 effect=effect,
-                reason=req.get("reason", f"required evidence {key} is {state}"),
+                reason=resolution_error or req.get("reason", f"required evidence {key} is {state}"),
             ))
 
     outcome = "PASS"
@@ -140,4 +191,5 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
         outcome=outcome,
         findings=[asdict(f) for f in findings],
         authority_granted=False,
+        evidence_lane=lane,
     )

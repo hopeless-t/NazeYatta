@@ -8,6 +8,8 @@ NazeYatta separates normative rules, observations, authority, and presentation.
 - Hazard != Violation
 - Control != Evidence of Control
 - Evidence != Authority
+- Provenance Present != Authority Proven
+- Evidence VERIFIED != Execution Authority
 - Reviewer Label != Authenticated Reviewer Identity
 - Rule Acknowledgement != Rule Compliance
 - Worker Explanation != Root Cause

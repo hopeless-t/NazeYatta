@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:nazeyatta:schema:evidence:0.1",
+  "$id": "urn:nazeyatta:schema:evidence:0.2",
   "title": "NazeYatta Evidence Record",
   "type": "object",
   "required": [
     "evidence_id",
     "supports_claim",
     "observed_at",
+    "observer",
     "verification"
   ],
   "properties": {
@@ -24,7 +25,12 @@
       "format": "date-time"
     },
     "observer": {
-      "type": "object"
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
     },
     "artifact": {
       "type": "object"
