@@ -54,11 +54,45 @@ class Receipt:
     evidence_lane: str
 
 
+# Input-size guards. Task and policy files are small by design; anything past these limits is
+# treated as malformed input rather than something to evaluate (deep nesting would otherwise end
+# in a RecursionError while fingerprinting).
+MAX_INPUT_BYTES = 1_048_576
+MAX_NESTING_DEPTH = 64
+MAX_NODES = 100_000
+
+
+def _check_shape(data: Any, path: str) -> None:
+    """Reject pathological nesting/size without recursion (explicit stack)."""
+    stack: list[tuple[Any, int]] = [(data, 0)]
+    nodes = 0
+    while stack:
+        value, depth = stack.pop()
+        nodes += 1
+        if nodes > MAX_NODES:
+            raise ValueError(f"{path}: too many nodes (> {MAX_NODES})")
+        if depth > MAX_NESTING_DEPTH:
+            raise ValueError(f"{path}: nesting deeper than {MAX_NESTING_DEPTH} levels")
+        if isinstance(value, dict):
+            for k, v in value.items():
+                if not isinstance(k, (str, bool, int, float)) or k is None:
+                    raise ValueError(f"{path}: unsupported mapping key {k!r}")
+                stack.append((v, depth + 1))
+        elif isinstance(value, (list, tuple)):
+            stack.extend((v, depth + 1) for v in value)
+        elif isinstance(value, float) and (value != value or value in (float("inf"), float("-inf"))):
+            raise ValueError(f"{path}: NaN/Infinity values are not allowed")
+
+
 def load_yaml(path: str | Path) -> dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as f:
+    p = Path(path)
+    if p.is_file() and p.stat().st_size > MAX_INPUT_BYTES:
+        raise ValueError(f"{path}: file larger than {MAX_INPUT_BYTES} bytes")
+    with open(p, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
         raise ValueError(f"expected mapping in {path}")
+    _check_shape(data, str(path))
     return data
 
 
@@ -81,8 +115,38 @@ def _canonical(value: Any) -> Any:
 
 
 def stable_hash(value: Any) -> str:
-    payload = json.dumps(_canonical(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=_json_default)
+    # allow_nan=False: NaN/Infinity have no canonical JSON form, so they cannot be part of a
+    # deterministic fingerprint. They are rejected as malformed input instead.
+    payload = json.dumps(_canonical(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+                         default=_json_default, allow_nan=False)
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _legacy_state(value: Any) -> str:
+    """Normalise a v0.1 scalar evidence value to a canonical state, conservatively.
+
+    Only ASCII strings are case-folded (``verified`` -> ``VERIFIED``). Anything else — non-string
+    values, non-ASCII look-alikes (Turkish dotless i, full-width letters), embedded whitespace or
+    zero-width characters — becomes ``INVALID`` rather than being coerced by ``str().upper()``.
+    """
+    if value is None:
+        return "UNKNOWN"
+    if not isinstance(value, str) or not value.isascii():
+        return "INVALID"
+    state = value.upper()
+    return state if state in EVIDENCE_STATES else "INVALID"
+
+
+def _accepted_states(rule_id: Any, req: dict[str, Any]) -> set[str]:
+    raw = req.get("accepted_states", ["VERIFIED"])
+    if not isinstance(raw, (list, tuple)) or not raw:
+        raise PolicyError(f"rule {rule_id!r}: 'accepted_states' must be a non-empty list")
+    out = set()
+    for s in raw:
+        if not isinstance(s, str) or not s.isascii() or s.upper() not in EVIDENCE_STATES:
+            raise PolicyError(f"rule {rule_id!r}: unknown accepted state {s!r}")
+        out.add(s.upper())
+    return out
 
 
 def _get(data: dict[str, Any], dotted: str) -> Any:
@@ -98,6 +162,8 @@ def _condition_matches(task: dict[str, Any], cond: dict[str, Any]) -> bool:
     if not isinstance(cond, dict) or "field" not in cond:
         raise PolicyError(f"condition must be a mapping with a 'field': {cond!r}")
     field = cond["field"]
+    if not isinstance(field, str) or not field:
+        raise PolicyError(f"condition 'field' must be a non-empty dotted string, got {field!r}")
     actual = _get(task, field)
     if "equals" in cond:
         return actual == cond["equals"]
@@ -158,7 +224,8 @@ def _evidence_lane(task: dict[str, Any]) -> str:
         return "provenance-v0.2"
     if task.get("schema_version") in (None, "0.1"):
         return "legacy-v0.1"
-    raise ValueError(f"unsupported schema_version: {task.get('schema_version')!r}")
+    hint = " (write it as a quoted string, e.g. \"0.2\")" if isinstance(task.get("schema_version"), (int, float)) else ""
+    raise ValueError(f"unsupported schema_version: {task.get('schema_version')!r}{hint}")
 
 
 def _is_offset_datetime(value: Any) -> bool:
@@ -251,9 +318,9 @@ def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: 
             else:
                 # v0.1 remains accepted for compatibility, but these scalar assertions are
                 # not provenance-qualified Evidence Records.
-                state = str(evidence.get(key, "UNKNOWN")).upper()
+                state = _legacy_state(evidence.get(key))
                 resolution_error = None
-            accepted = {s.upper() for s in req.get("accepted_states", ["VERIFIED"])}
+            accepted = _accepted_states(rule["id"], req)
             if state in accepted:
                 continue
             effect_map = _effect_map(rule["id"], req)

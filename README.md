@@ -78,6 +78,8 @@ nazeyatta debrief-template NY-LIVE-001
 
 Integrations that must not accept legacy scalar evidence can add `--require-lane provenance-v0.2`; a task that resolves to `legacy-v0.1` then exits `2` with `LANE MISMATCH`.
 
+Task and policy files are treated as untrusted text: text shown in the receipt is sanitised (control characters become `�`), legacy scalar evidence must be an ASCII state word (`verified` is accepted, look-alikes and non-strings are `INVALID`), and files over 1 MiB, nested deeper than 64 levels or containing NaN/Infinity are rejected as `INVALID INPUT`. The `--json` receipt carries the original strings, JSON-escaped.
+
 ### v0.2 provenance input
 
 Legacy v0.1 task files remain supported: `task.evidence` values are scalar states such as `VERIFIED`. Their receipts say `evidence_lane: legacy-v0.1`; compatibility does **not** turn those scalar assertions into provenance-qualified Evidence Records.
