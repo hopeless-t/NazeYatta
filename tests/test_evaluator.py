@@ -1,9 +1,11 @@
 import json
 from dataclasses import asdict
+from importlib.metadata import version as package_version
 from pathlib import Path
 
 import pytest
 
+from nazeyatta import __version__
 from nazeyatta.evaluator import evaluate, load_yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +54,12 @@ def test_emitted_receipt_matches_receipt_schema_properties():
 def test_packaged_policy_matches_public_policy():
     packaged = load_yaml(ROOT / "src/nazeyatta/data/generic_rules.yaml")
     assert packaged == POLICIES
+
+
+def test_package_runtime_and_receipt_versions_match():
+    result = evaluate(load_yaml(ROOT / "examples/safe-read.yaml"), POLICIES)
+    assert package_version("nazeyatta") == __version__
+    assert result.evaluator_version == __version__
 
 
 def v02_safe_read(record: dict | None = None) -> dict:
