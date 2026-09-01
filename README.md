@@ -2,22 +2,148 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
+**NazeYatta** checks a small YAML task description against safety/policy rules **before an AI worker or software agent acts**.
+
+It returns a deterministic preflight result such as `PASS`, `REVIEW`, `EVIDENCE_REQUIRED`, or `BLOCK`, together with a receipt that explains what was checked.
+
+This is an alpha research tool. It is not a certification, adoption claim, or authority-granting system.
+
+## When should I use it?
+
+Use NazeYatta before actions where a worker should not rely on memory, self-confidence, or an unverified assumption alone, for example:
+
+- deleting or changing files;
+- `git push` or other external writes;
+- publishing content;
+- operations that require permission, capability, target verification, or evidence;
+- work where `UNKNOWN` must not silently become "probably safe".
+
+## Try it in about 30 seconds
+
+Requires Python 3.11+.
+
+```bash
+git clone https://github.com/hopeless-t/NazeYatta.git
+cd NazeYatta
+python -m venv .venv
+. .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install -e .
+
+nazeyatta check examples/publish-photo.yaml
+```
+
+You should see a result like:
+
+```text
+NAZEYATTA
+👈😽 PRE-FLIGHT KY
+
+✋😾 BLOCK
+
+NY-PUB-001  External publication requires verified provenance and permission
+  hazard: PUBLICATION_WITH_UNKNOWN_RIGHTS
+  evidence: publication_permission_verified = UNKNOWN
+  effect: BLOCK
+
+EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
+```
+
+In plain language: this example wants to publish something, but publication permission is still `UNKNOWN`, so the preflight blocks it instead of guessing that permission exists.
+
+The joke is intentional. The evidence is not.
+
+## What does the result mean?
+
+- `PASS` — the supplied task, policy, and evidence passed this preflight.
+- `CAUTION` / `REVIEW` / `EVIDENCE_REQUIRED` — do not silently continue; follow the surrounding workflow and obtain the required review/evidence.
+- `BLOCK` — the policy says the action must stop under the supplied state.
+
+`0` means `PASS`. `CAUTION`, `REVIEW`, `EVIDENCE_REQUIRED`, and `BLOCK` return a non-zero exit status.
+
+Most importantly:
+
+```text
+KY PASS != Authority Granted
+```
+
+A NazeYatta `PASS` does **not** grant execution authority. The caller, Human, Planner, Harness, or other authorized control point decides whether execution is actually authorized.
+
+## Your first task
+
+A task file is a small YAML manifest describing the action and the evidence NazeYatta should evaluate. For a simple repository read, start with something like:
+
+```yaml
+task_id: MY-FIRST-READ
+action:
+  operation: read
+  side_effect: none
+  externality: internal
+worker:
+  required_capability: read_repository
+semantics:
+  critical_meaning_complete: true
+evidence:
+  worker_capability_qualified: VERIFIED
+```
+
+Save it as `my-first-task.yaml`, then run:
+
+```bash
+nazeyatta check my-first-task.yaml
+```
+
+### Who is allowed to supply those fields?
+
+The v0.1-alpha ownership boundary is intentionally conservative:
+
+- task/action/data facts should come from the upstream Human, Planner, task specification, or trusted adapter;
+- evidence should come from a Human, trusted adapter, or evidence source appropriate to the workflow;
+- the worker that wants to act must not manufacture its own `VERIFIED` facts;
+- NazeYatta evaluates the supplied structure, linkage, and policy conditions; it does **not** independently authenticate the real-world producer of those facts in v0.1-alpha.
+
+```text
+Worker Self-Declaration != Evidence
+Producer Identity != Evidence Authority
+```
+
+## What happens after preflight?
+
+```text
+Human / Planner / trusted Adapter
+        ↓
+     task YAML
+        ↓
+    NazeYatta
+        ↓
+ preflight receipt
+        ↓
+authorized caller / control point
+        ↓
+execute only if separately authorized
+```
+
+A non-`PASS` result means stop/review according to the surrounding workflow. A `PASS` means only that this preflight passed for the supplied state.
+
+## More examples
+
+```bash
+nazeyatta check examples/safe-read.yaml
+nazeyatta check examples/destructive-delete.yaml
+nazeyatta check examples/provenance-qualified-safe-read.yaml
+nazeyatta check examples/provenance-claim-mismatch.yaml
+nazeyatta debrief-template NY-LIVE-001
+```
+
+---
+
 > **The AI worker said it understood the rule.**  
 > **Then, somehow, it did exactly what the rule said not to do.**
 >
 > 🙏 Please. Just follow the instructions.
 
-**NazeYatta** is an experimental preflight hazard-analysis and violation-debrief tool for AI workers and software agents.
+NazeYatta is an experimental **preflight hazard-analysis + violation-debrief** tool for AI workers and software agents.
 
 It makes a small set of task-relevant rules and hazards explicit before action, evaluates mechanically checkable requirements against supplied evidence, and preserves a structured debrief path when observed behavior violates the rule.
-
-## v0.1-alpha with the v0.2 provenance-input lane
-
-**Implemented now:** deterministic YAML preflight evaluation, an explicit evidence-state model, conservative CLI exit statuses, receipt fingerprints, a structured violation-debrief template, and a small v0.2 provenance-input lane.
-
-**Deliberately not implemented yet:** task-YAML generation, provenance adapters, runtime observation, live-trace violation detection, or automatic enforcement. NazeYatta resolves supplied v0.2 records deterministically; it does **not** authenticate the observer or authorize who may assert `VERIFIED`.
-
-This is an alpha research tool, not a certification, adoption claim, or authority-granting system.
 
 ```text
 👈😽  "I noticed the hazard."
@@ -35,46 +161,13 @@ NAZE YATTA?
 (Why did you do that? / What happened?)
 ```
 
-## 30-second example
+## Current alpha status
 
-```text
-$ nazeyatta check examples/publish-photo.yaml
+### v0.1-alpha with the v0.2 provenance-input lane
 
-NAZEYATTA
-👈😽 PRE-FLIGHT KY
+**Implemented now:** deterministic YAML preflight evaluation, an explicit evidence-state model, conservative CLI exit statuses, receipt fingerprints, a structured violation-debrief template, and a small v0.2 provenance-input lane.
 
-✋😾 BLOCK
-
-NY-PUB-001  External publication requires verified provenance and permission
-  hazard: PUBLICATION_WITH_UNKNOWN_RIGHTS
-  evidence: publication_permission_verified = UNKNOWN
-  effect: BLOCK
-
-EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
-```
-
-The joke is intentional. The evidence is not.
-
-## Quick start
-
-Requires Python 3.11+.
-
-```bash
-git clone https://github.com/hopeless-t/NazeYatta.git
-cd NazeYatta
-python -m venv .venv
-. .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install -e .
-
-nazeyatta check examples/safe-read.yaml
-nazeyatta check examples/publish-photo.yaml
-nazeyatta check examples/destructive-delete.yaml
-nazeyatta check examples/provenance-qualified-safe-read.yaml
-nazeyatta check examples/provenance-claim-mismatch.yaml
-nazeyatta debrief-template NY-LIVE-001
-```
-
-`0` means `PASS`. `CAUTION`, `REVIEW`, `EVIDENCE_REQUIRED`, and `BLOCK` return a non-zero exit status.
+**Deliberately not implemented yet:** task-YAML generation, provenance adapters, runtime observation, live-trace violation detection, or automatic enforcement. NazeYatta resolves supplied v0.2 records deterministically; it does **not** authenticate the observer or authorize who may assert `VERIFIED`.
 
 ### v0.2 provenance input
 
