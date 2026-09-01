@@ -280,7 +280,7 @@ def _v02_effective_state(
     return state, None
 
 
-def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: str = "0.1.0a1") -> Receipt:
+def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: str = "0.1.0a2") -> Receipt:
     evidence = task.get("evidence", {})
     if not isinstance(evidence, dict):
         raise ValueError("task.evidence must be a mapping")
