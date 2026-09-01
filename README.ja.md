@@ -2,24 +2,148 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
+**NazeYatta** は、AI WorkerやSoftware Agentが実際に行動する**前**に、小さなYAMLのTask記述をSafety / Policy Ruleと照合するツールです。
+
+`PASS`、`REVIEW`、`EVIDENCE_REQUIRED`、`BLOCK` などの決定論的なPreflight結果と、「何を確認したのか」を示すReceiptを返します。
+
+これはalpha段階のresearch toolです。Certification・導入実績・Authority Granting Systemを主張するものではありません。
+
+## いつ使うの？
+
+Workerが記憶・自信・未確認の推測だけで進めてはいけない作業の前に使います。例えば：
+
+- ファイルを削除・変更する前
+- `git push` やその他のexternal writeの前
+- コンテンツを公開する前
+- Permission / Capability / Target / Evidenceの確認が必要な操作の前
+- `UNKNOWN`を「たぶん大丈夫」に勝手に変えてはいけない作業
+
+## まず30秒くらいで動かす
+
+Python 3.11+ が必要です。
+
+```bash
+git clone https://github.com/hopeless-t/NazeYatta.git
+cd NazeYatta
+python -m venv .venv
+. .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install -e .
+
+nazeyatta check examples/publish-photo.yaml
+```
+
+次のような結果が出ます。
+
+```text
+NAZEYATTA
+👈😽 PRE-FLIGHT KY
+
+✋😾 BLOCK
+
+NY-PUB-001  External publication requires verified provenance and permission
+  hazard: PUBLICATION_WITH_UNKNOWN_RIGHTS
+  evidence: publication_permission_verified = UNKNOWN
+  effect: BLOCK
+
+EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
+```
+
+平たく言うと、このExampleは「外部へ公開したい」というTaskなのに、公開許可がまだ`UNKNOWN`です。そこでNazeYattaは「許可されているはず」と推測せず、Preflightで止めます。
+
+表示はふざけています。**Evidenceはふざけていません。**
+
+## 結果はどう読めばいいの？
+
+- `PASS` — supplied task / policy / evidence が今回のPreflightを通過した
+- `CAUTION` / `REVIEW` / `EVIDENCE_REQUIRED` — 勝手に続行せず、周囲のWorkflowに従ってReviewやEvidenceを得る
+- `BLOCK` — supplied stateではPolicy上そのActionを止める
+
+CLIのexit statusは保守的です。`PASS`だけが`0`で、`CAUTION / REVIEW / EVIDENCE_REQUIRED / BLOCK`はnon-zeroです。
+
+一番大事なのはこれです。
+
+```text
+KY PASS != Authority Granted
+```
+
+NazeYattaの`PASS`は**実行権限そのものを付与しません**。実際に実行してよいかは、Caller / Human / Planner / Harness / その他のAuthorized Control Pointが別途判断します。
+
+## 自分の最初のTaskを作る
+
+Task fileは、「何をするのか」と「何をEvidenceとして評価するのか」を書いた小さなYAML Manifestです。単純なRepository readなら、まずはこの程度から始められます。
+
+```yaml
+task_id: MY-FIRST-READ
+action:
+  operation: read
+  side_effect: none
+  externality: internal
+worker:
+  required_capability: read_repository
+semantics:
+  critical_meaning_complete: true
+evidence:
+  worker_capability_qualified: VERIFIED
+```
+
+`my-first-task.yaml`として保存し、次を実行します。
+
+```bash
+nazeyatta check my-first-task.yaml
+```
+
+### そのfieldは誰が書いていいの？
+
+v0.1-alphaではOwnership Boundaryを意図的に保守的に扱います。
+
+- task / action / data の事実は、上流のHuman / Planner / Task Specification / trusted Adapterから供給する
+- evidenceは、そのWorkflowで適切なHuman / trusted Adapter / Evidence Sourceから供給する
+- 実行したいWorker自身が、自分に都合のよい`VERIFIED`を製造してはいけない
+- NazeYattaが評価するのはsupplied structure / linkage / policy conditionであり、v0.1-alphaでは現実世界のProducer本人性やAuthorityを独立にauthenticateしない
+
+```text
+Worker Self-Declaration != Evidence
+Producer Identity != Evidence Authority
+```
+
+## Preflightのあと何が起きるの？
+
+```text
+Human / Planner / trusted Adapter
+        ↓
+     task YAML
+        ↓
+    NazeYatta
+        ↓
+ preflight receipt
+        ↓
+authorized caller / control point
+        ↓
+別途authorizedされた場合だけexecute
+```
+
+non-`PASS`なら周囲のWorkflowに従ってStop / Reviewします。`PASS`が意味するのは、**supplied stateについて今回のPreflightを通過した**ということだけです。
+
+## ほかのExample
+
+```bash
+nazeyatta check examples/safe-read.yaml
+nazeyatta check examples/destructive-delete.yaml
+nazeyatta check examples/provenance-qualified-safe-read.yaml
+nazeyatta check examples/provenance-claim-mismatch.yaml
+nazeyatta debrief-template NY-LIVE-001
+```
+
+---
+
 > **AI Workerは「ルールを理解しました」と言った。**  
 > **そのあと、なぜかそのルールで禁止したことをそのままやった。**
 >
 > 🙏 お願いです。指示通り働いてください。
 
-**NazeYatta** は、AI WorkerやSoftware Agent向けの、実験的な**作業前危険予知（Preflight Hazard Analysis）＋違反振り返り（Violation Debrief）ツール**です。
+NazeYattaは、AI WorkerやSoftware Agent向けの、実験的な**作業前危険予知（Preflight Hazard Analysis）＋違反振り返り（Violation Debrief）ツール**です。
 
 作業前に今回重要なルールと危険を少数だけ前景化し、機械的に確認できる要求はEvidenceと照合し、違反が観測されたら「なぜやった？」から始まるStructured Debriefへつなげます。
-
-## v0.1-alpha：最初に分かること
-
-**現在実装済み：** deterministic YAML preflight evaluation、明示的なEvidence State model、保守的なCLI exit status、receipt fingerprint、structured violation-debrief template。
-
-**v0.2 provenance input lane：** `schema_version: "0.2"` では、既存policy keyを変えずに `task.evidence` のclaim keyからEvidence Record IDを参照し、`evidence_records` の `evidence_id`、`supports_claim`、`observed_at`、`observer.type`、正規化済み `verification.state` を保守的に解決する。欠落は`MISSING`、不整合は`INVALID`であり、勝手に`VERIFIED`にはならない。旧v0.1のscalar evidenceも互換性のため残るが、receiptでは`legacy-v0.1`と表示され、provenance-qualified evidenceではない。
-
-**意図的に未実装：** task YAMLの生成、provenance adapter、runtime observation、live traceとのviolation detection、automatic enforcement。NazeYattaはrecord形状・claim linkを評価するが、誰が`VERIFIED`をassertしてよいかをauthenticate/authorizeするものではありません。
-
-これはalpha段階のresearch toolです。Certification・導入実績・authority granting systemを主張するものではありません。
 
 ```text
 👈😽  「この危険を認識しました」
@@ -37,44 +161,15 @@ NAZE YATTA?
 （なぜやった？ / 何が起きた？）
 ```
 
-## 30秒で見るNazeYatta
+## 現在のalpha状態
 
-```text
-$ nazeyatta check examples/publish-photo.yaml
+### v0.1-alpha + v0.2 provenance input lane
 
-NAZEYATTA
-👈😽 PRE-FLIGHT KY
+**現在実装済み：** deterministic YAML preflight evaluation、明示的なEvidence State model、保守的なCLI exit status、receipt fingerprint、structured violation-debrief template。
 
-✋😾 BLOCK
+**v0.2 provenance input lane：** `schema_version: "0.2"` では、既存policy keyを変えずに `task.evidence` のclaim keyからEvidence Record IDを参照し、`evidence_records` の `evidence_id`、`supports_claim`、`observed_at`、`observer.type`、正規化済み `verification.state` を保守的に解決する。欠落は`MISSING`、不整合は`INVALID`であり、勝手に`VERIFIED`にはならない。旧v0.1のscalar evidenceも互換性のため残るが、receiptでは`legacy-v0.1`と表示され、provenance-qualified evidenceではない。
 
-NY-PUB-001  External publication requires verified provenance and permission
-  hazard: PUBLICATION_WITH_UNKNOWN_RIGHTS
-  evidence: publication_permission_verified = UNKNOWN
-  effect: BLOCK
-
-EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
-```
-
-表示はふざけています。**Evidenceはふざけていません。**
-
-## Quick Start
-
-Python 3.11+ が必要です。
-
-```bash
-git clone https://github.com/hopeless-t/NazeYatta.git
-cd NazeYatta
-python -m venv .venv
-. .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install -e .
-
-nazeyatta check examples/safe-read.yaml
-nazeyatta check examples/publish-photo.yaml
-nazeyatta check examples/destructive-delete.yaml
-nazeyatta debrief-template NY-LIVE-001
-```
-
-CLIのexit statusは保守的です。`PASS`だけが`0`で、`CAUTION / REVIEW / EVIDENCE_REQUIRED / BLOCK`はnon-zeroです。
+**意図的に未実装：** task YAMLの生成、provenance adapter、runtime observation、live traceとのviolation detection、automatic enforcement。NazeYattaはrecord形状・claim linkを評価するが、誰が`VERIFIED`をassertしてよいかをauthenticate/authorizeするものではありません。
 
 ## どう動くの？
 
@@ -179,6 +274,10 @@ KY Completed != Authority to Execute
 KY PASS != Authority Granted
 Unknown != Safe
 Worker Self-Declaration != Evidence
+Document Author != Field Authority
+Producer Identity != Evidence Authority
+Provenance Present != Authority Proven
+Evidence VERIFIED != Execution Authority
 Artifact != Evidence
 Familiar Task != Same State
 Past Success != Current Safety
@@ -200,6 +299,7 @@ Generative Discoveryは注意領域を広げてもよい。Authoritative Require
 - 機械的に評価できる範囲でのdeterministic YAML rule evaluation
 - Generic 10-rule baseline policy bundle
 - Evidence Stateの明示的取扱い
+- v0.2 Evidence Record reference resolution（v0.1 compatibility receiptを明示）
 - Task / Policy fingerprint付きPreflight Receipt
 - `PASS`だけをexit `0`とする保守的CLI
 - Naze-Yatta Debrief Template
@@ -218,7 +318,7 @@ Generative Discoveryは注意領域を広げてもよい。Authoritative Require
 
 ## Evidence・Authority・Completion
 
-NazeYattaでは、Evidenceを少なくとも**「何を主張するのか」「何を観測したのか」「その観測はどこから来たのか」**に結び付け、必要に応じて時点・状態も扱います。詳しくは[`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md)。
+NazeYattaでは、Evidenceを少なくとも**「何を主張するのか」「何を観測したのか」「その観測はどこから来たのか」**に結び付け、必要に応じて時点・状態も扱います。v0.2 laneはrecord形状とclaim linkageを確認しますが、observerの現実世界でのAuthority自体を証明するものではありません。詳しくは[`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md)。
 
 `PASS`はAuthorityを製造しません。
 
