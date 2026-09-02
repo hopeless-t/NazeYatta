@@ -2,23 +2,27 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-**NazeYatta** checks a small YAML task description against safety/policy rules **before an AI worker or software agent acts**.
+**NazeYatta is a check-before-you-act tool for AI workers and automation.**
 
-It returns a deterministic preflight result such as `PASS`, `REVIEW`, `EVIDENCE_REQUIRED`, or `BLOCK`, together with a receipt that explains what was checked.
+For example, if a task says "publish this photo" but publication permission has not been confirmed, NazeYatta can return `BLOCK` instead of guessing that permission exists. It returns a result such as `PASS`, `REVIEW`, or `BLOCK`, plus a record of what it checked.
+
+NazeYatta does not perform the task itself. It is a **preflight check before execution**.
+
+```text
+You / Planner
+     ↓
+"I want this task done"
+     ↓
+  NazeYatta
+     ↓
+PASS / REVIEW / BLOCK
+     ↓
+A separate authority decides whether execution may proceed
+```
 
 This is an alpha research tool. It is not a certification, adoption claim, or authority-granting system.
 
-## When should I use it?
-
-Use NazeYatta before actions where a worker should not rely on memory, self-confidence, or an unverified assumption alone, for example:
-
-- deleting or changing files;
-- `git push` or other external writes;
-- publishing content;
-- operations that require permission, capability, target verification, or evidence;
-- work where `UNKNOWN` must not silently become "probably safe".
-
-## Try it in about 30 seconds
+## Run it once
 
 Requires Python 3.11+.
 
@@ -32,7 +36,9 @@ python -m pip install -e .
 nazeyatta check examples/publish-photo.yaml
 ```
 
-You should see a result like:
+This example wants to publish something, but permission to publish has not been confirmed.
+
+So it returns `BLOCK`:
 
 ```text
 NAZEYATTA
@@ -48,17 +54,29 @@ NY-PUB-001  External publication requires verified provenance and permission
 EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
 ```
 
-In plain language: this example wants to publish something, but publication permission is still `UNKNOWN`, so the preflight blocks it instead of guessing that permission exists.
+In plain language:
 
-The joke is intentional. The evidence is not.
+> **"I cannot confirm that publishing is allowed, so I will not treat it as safe to continue."**
 
-## What does the result mean?
+The joke is intentional. **The evidence is not.**
+
+## When would I use it?
+
+Before an AI worker or automated tool does things such as:
+
+- deleting or changing files;
+- `git push` or other external writes;
+- publishing content;
+- actions that require permission, capability, target verification, or evidence;
+- work where `UNKNOWN` must not silently become "probably safe".
+
+## What do the results mean?
 
 - `PASS` — the supplied task, policy, and evidence passed this preflight.
-- `CAUTION` / `REVIEW` / `EVIDENCE_REQUIRED` — do not silently continue; follow the surrounding workflow and obtain the required review/evidence.
-- `BLOCK` — the policy says the action must stop under the supplied state.
+- `REVIEW` / `EVIDENCE_REQUIRED` / `CAUTION` — something still needs review or evidence; do not silently continue.
+- `BLOCK` — the action must stop under the supplied state.
 
-`0` means `PASS`. `CAUTION`, `REVIEW`, `EVIDENCE_REQUIRED`, and `BLOCK` return a non-zero exit status.
+Only `PASS` returns CLI exit status `0`. The other outcomes are non-zero.
 
 Most importantly:
 
@@ -66,11 +84,13 @@ Most importantly:
 KY PASS != Authority Granted
 ```
 
-A NazeYatta `PASS` does **not** grant execution authority. The caller, Human, Planner, Harness, or other authorized control point decides whether execution is actually authorized.
+**`PASS` is not permission to execute.** A Human, Planner, Harness, or other authorized control point separately decides whether execution is allowed.
 
-## Your first task
+## What do I give NazeYatta?
 
-A task file is a small YAML manifest describing the action and the evidence NazeYatta should evaluate. For a simple repository read, start with something like:
+You describe the task in a small YAML file.
+
+For a simple repository read, start with:
 
 ```yaml
 task_id: MY-FIRST-READ
@@ -92,39 +112,21 @@ Save it as `my-first-task.yaml`, then run:
 nazeyatta check my-first-task.yaml
 ```
 
-### Who is allowed to supply those fields?
+### Who is allowed to supply those facts?
 
-The v0.1-alpha ownership boundary is intentionally conservative:
+The v0.1-alpha boundary is intentionally conservative:
 
 - task/action/data facts should come from the upstream Human, Planner, task specification, or trusted adapter;
 - evidence should come from a Human, trusted adapter, or evidence source appropriate to the workflow;
 - the worker that wants to act must not manufacture its own `VERIFIED` facts;
-- NazeYatta evaluates the supplied structure, linkage, and policy conditions; it does **not** independently authenticate the real-world producer of those facts in v0.1-alpha.
+- NazeYatta evaluates supplied structure, linkage, and policy conditions; it does not independently prove who has real-world authority to assert those facts.
 
 ```text
 Worker Self-Declaration != Evidence
 Producer Identity != Evidence Authority
 ```
 
-## What happens after preflight?
-
-```text
-Human / Planner / trusted Adapter
-        ↓
-     task YAML
-        ↓
-    NazeYatta
-        ↓
- preflight receipt
-        ↓
-authorized caller / control point
-        ↓
-execute only if separately authorized
-```
-
-A non-`PASS` result means stop/review according to the surrounding workflow. A `PASS` means only that this preflight passed for the supplied state.
-
-## More examples
+## Try more examples
 
 ```bash
 nazeyatta check examples/safe-read.yaml
@@ -133,6 +135,8 @@ nazeyatta check examples/provenance-qualified-safe-read.yaml
 nazeyatta check examples/provenance-claim-mismatch.yaml
 nazeyatta debrief-template NY-LIVE-001
 ```
+
+The sections below explain the design philosophy, evidence model, KY inspiration, and current research state in more detail.
 
 ---
 
