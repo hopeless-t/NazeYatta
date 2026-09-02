@@ -341,6 +341,7 @@ A `PASS` never manufactures authority:
 ```text
 KY PASS != Authority Granted
 ```
+
 And when a task contract says completion returns control to a Human, Planner, Reviewer, or other authority:
 
 ```text
