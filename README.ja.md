@@ -196,7 +196,7 @@ flowchart TB
     F --> G["🫵😿❓ NAZE YATTA?<br/>(なぜやった？ / 何が起きた？)"]
 ```
 
-現在の`v0.1-alpha`が実装しているのは、主に**Mandatory Ruleの決論的Preflight lane**と**Structured Debrief Template**です。Runtime Observation AdapterやWorker自身によるSituational KY生成は、現時点では自動のend-to-end enforcementとしては未実装です。
+現在の`v0.1-alpha`が実装しているのは、主に**Mandatory Ruleの決定論的Preflight lane**と**Structured Debrief Template**です。Runtime Observation AdapterやWorker自身によるSituational KY生成は、現時点では自動のend-to-end enforcementとしては未実装です。
 
 ## KY / 危険予知とは
 
@@ -347,6 +347,7 @@ KY PASS != Authority Granted
 **Helpful != Authorized.**
 
 ## Limitations
+
 NazeYattaは、AI Workerが必ず指示通り動くことを保証しません。PreflightだけではComplianceを強制できません。
 
 高ImpactなActionでは、Worker自身がbypassできないExternal Runtime Gateと組み合わせてください。
