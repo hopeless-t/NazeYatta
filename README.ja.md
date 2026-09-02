@@ -2,23 +2,27 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-**NazeYatta** は、AI WorkerやSoftware Agentが実際に行動する**前**に、小さなYAMLのTask記述をSafety / Policy Ruleと照合するツールです。
+**NazeYattaは、AIや自動ツールに仕事をさせる前の「チェック係」です。**
 
-`PASS`、`REVIEW`、`EVIDENCE_REQUIRED`、`BLOCK` などの決定論的なPreflight結果と、「何を確認したのか」を示すReceiptを返します。
+たとえば「この写真を公開して」という作業でも、公開してよいことが確認できていなければ `BLOCK` します。確認できた条件については `PASS` / `REVIEW` / `BLOCK` などの結果と、何を確認したかの記録を返します。
+
+NazeYatta自身が仕事を実行するわけではありません。**実行前に、いったん確認するための道具**です。
+
+```text
+あなた / Planner
+      ↓
+「この作業をしたい」
+      ↓
+   NazeYatta
+      ↓
+ PASS / REVIEW / BLOCK
+      ↓
+実際に進めるかは別の権限者が決める
+```
 
 これはalpha段階のresearch toolです。Certification・導入実績・Authority Granting Systemを主張するものではありません。
 
-## いつ使うの？
-
-Workerが記憶・自信・未確認の推測だけで進めてはいけない作業の前に使います。例えば：
-
-- ファイルを削除・変更する前
-- `git push` やその他のexternal writeの前
-- コンテンツを公開する前
-- Permission / Capability / Target / Evidenceの確認が必要な操作の前
-- `UNKNOWN`を「たぶん大丈夫」に勝手に変えてはいけない作業
-
-## まず30秒くらいで動かす
+## まず1回動かす
 
 Python 3.11+ が必要です。
 
@@ -32,7 +36,9 @@ python -m pip install -e .
 nazeyatta check examples/publish-photo.yaml
 ```
 
-次のような結果が出ます。
+このExampleは「外部へ公開したい」という作業です。しかし、公開してよいことがまだ確認できていません。
+
+そのため、次のように `BLOCK` します。
 
 ```text
 NAZEYATTA
@@ -48,17 +54,31 @@ NY-PUB-001  External publication requires verified provenance and permission
 EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
 ```
 
-平たく言うと、このExampleは「外部へ公開したい」というTaskなのに、公開許可がまだ`UNKNOWN`です。そこでNazeYattaは「許可されているはず」と推測せず、Preflightで止めます。
+平たく言えば：
+
+> **「公開していいか分からないので、勝手に進めません。」**
+
+です。
 
 表示はふざけています。**Evidenceはふざけていません。**
 
-## 結果はどう読めばいいの？
+## どんな時に使うの？
 
-- `PASS` — supplied task / policy / evidence が今回のPreflightを通過した
-- `CAUTION` / `REVIEW` / `EVIDENCE_REQUIRED` — 勝手に続行せず、周囲のWorkflowに従ってReviewやEvidenceを得る
-- `BLOCK` — supplied stateではPolicy上そのActionを止める
+AI Workerや自動ツールに、たとえば次のような作業をさせる前です。
 
-CLIのexit statusは保守的です。`PASS`だけが`0`で、`CAUTION / REVIEW / EVIDENCE_REQUIRED / BLOCK`はnon-zeroです。
+- ファイルを削除・変更する
+- `git push` など外部へ書き込む
+- コンテンツを公開する
+- Permission / Capability / Target / Evidenceの確認が必要な操作をする
+- `UNKNOWN`を「たぶん大丈夫」に勝手に変えてほしくない
+
+## 結果はどう読むの？
+
+- `PASS` — 今回渡されたTask / Policy / Evidenceについて、このPreflightを通過した
+- `REVIEW` / `EVIDENCE_REQUIRED` / `CAUTION` — 確認やEvidenceが足りないので、そのまま進めない
+- `BLOCK` — 今回渡された状態では、そのActionを止める
+
+CLIでは `PASS` だけがexit status `0`です。それ以外はnon-zeroです。
 
 一番大事なのはこれです。
 
@@ -66,11 +86,13 @@ CLIのexit statusは保守的です。`PASS`だけが`0`で、`CAUTION / REVIEW 
 KY PASS != Authority Granted
 ```
 
-NazeYattaの`PASS`は**実行権限そのものを付与しません**。実際に実行してよいかは、Caller / Human / Planner / Harness / その他のAuthorized Control Pointが別途判断します。
+**`PASS`は「実行してよい」という権限そのものではありません。** 実際に実行するかは、Human / Planner / Harnessなど、別のAuthorized Control Pointが決めます。
 
-## 自分の最初のTaskを作る
+## NazeYattaには何を渡すの？
 
-Task fileは、「何をするのか」と「何をEvidenceとして評価するのか」を書いた小さなYAML Manifestです。単純なRepository readなら、まずはこの程度から始められます。
+作業内容を小さなYAMLファイルで渡します。
+
+最初は「Repositoryを読むだけ」なら、この程度です。
 
 ```yaml
 task_id: MY-FIRST-READ
@@ -86,45 +108,31 @@ evidence:
   worker_capability_qualified: VERIFIED
 ```
 
-`my-first-task.yaml`として保存し、次を実行します。
+`my-first-task.yaml`として保存して：
 
 ```bash
 nazeyatta check my-first-task.yaml
 ```
 
-### そのfieldは誰が書いていいの？
+と実行します。
 
-v0.1-alphaではOwnership Boundaryを意図的に保守的に扱います。
+### 誰がその情報を書いていいの？
+
+v0.1-alphaでは、ここを保守的に扱います。
 
 - task / action / data の事実は、上流のHuman / Planner / Task Specification / trusted Adapterから供給する
 - evidenceは、そのWorkflowで適切なHuman / trusted Adapter / Evidence Sourceから供給する
 - 実行したいWorker自身が、自分に都合のよい`VERIFIED`を製造してはいけない
-- NazeYattaが評価するのはsupplied structure / linkage / policy conditionであり、v0.1-alphaでは現実世界のProducer本人性やAuthorityを独立にauthenticateしない
+- NazeYattaは渡された構造・関連・policy conditionを評価するが、現実世界で「誰がそのEvidenceを主張してよいか」まで独立に認証するものではない
 
 ```text
 Worker Self-Declaration != Evidence
 Producer Identity != Evidence Authority
 ```
 
-## Preflightのあと何が起きるの？
+## 次に読むなら
 
-```text
-Human / Planner / trusted Adapter
-        ↓
-     task YAML
-        ↓
-    NazeYatta
-        ↓
- preflight receipt
-        ↓
-authorized caller / control point
-        ↓
-別途authorizedされた場合だけexecute
-```
-
-non-`PASS`なら周囲のWorkflowに従ってStop / Reviewします。`PASS`が意味するのは、**supplied stateについて今回のPreflightを通過した**ということだけです。
-
-## ほかのExample
+まず安全なExampleを試したい場合：
 
 ```bash
 nazeyatta check examples/safe-read.yaml
@@ -133,6 +141,8 @@ nazeyatta check examples/provenance-qualified-safe-read.yaml
 nazeyatta check examples/provenance-claim-mismatch.yaml
 nazeyatta debrief-template NY-LIVE-001
 ```
+
+ここから下は、設計思想・Evidence・KY・現在の研究状態を詳しく説明します。
 
 ---
 
@@ -186,7 +196,7 @@ flowchart TB
     F --> G["🫵😿❓ NAZE YATTA?<br/>(なぜやった？ / 何が起きた？)"]
 ```
 
-現在の`v0.1-alpha`が実装しているのは、主に**Mandatory Ruleの決定論的Preflight lane**と**Structured Debrief Template**です。Runtime Observation AdapterやWorker自身によるSituational KY生成は、現時点では自動のend-to-end enforcementとしては未実装です。
+現在の`v0.1-alpha`が実装しているのは、主に**Mandatory Ruleの決論的Preflight lane**と**Structured Debrief Template**です。Runtime Observation AdapterやWorker自身によるSituational KY生成は、現時点では自動のend-to-end enforcementとしては未実装です。
 
 ## KY / 危険予知とは
 
@@ -337,7 +347,6 @@ KY PASS != Authority Granted
 **Helpful != Authorized.**
 
 ## Limitations
-
 NazeYattaは、AI Workerが必ず指示通り動くことを保証しません。PreflightだけではComplianceを強制できません。
 
 高ImpactなActionでは、Worker自身がbypassできないExternal Runtime Gateと組み合わせてください。
