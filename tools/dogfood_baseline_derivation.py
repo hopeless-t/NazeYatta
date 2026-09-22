@@ -8,6 +8,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "tests" / "fixtures" / "source-observation"
+SPEC_PATH = ROOT / "examples" / "dogfood-baseline-derivation-spec.json"
 
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -30,16 +31,71 @@ def _read_json_fixture(name: str) -> tuple[dict, str]:
     return data, token
 
 
+def _load_spec() -> tuple[dict, str]:
+    payload = SPEC_PATH.read_bytes()
+    spec = json.loads(payload.decode("utf-8"))
+    if not isinstance(spec, dict):
+        raise RuntimeError("derivation spec must be a JSON object")
+
+    expected_top = {
+        "schema_version",
+        "spec_id",
+        "classification",
+        "version",
+        "source_classifications",
+        "mapping",
+        "semantic_correctness_claimed",
+        "authority_granted",
+    }
+    if set(spec) != expected_top:
+        raise RuntimeError("derivation spec has unsupported or missing top-level fields")
+    if spec["schema_version"] != "0.1":
+        raise RuntimeError("unsupported derivation spec schema_version")
+    if spec["spec_id"] != "dogfood-fixture-baseline-transform":
+        raise RuntimeError("unsupported derivation spec id")
+    if spec["classification"] != "DOGFOOD_BASELINE_DERIVATION_SPEC":
+        raise RuntimeError("unexpected derivation spec classification")
+    if spec["version"] != "0.1":
+        raise RuntimeError("unsupported derivation spec version")
+    if spec["semantic_correctness_claimed"] is not False:
+        raise RuntimeError("derivation spec must not claim semantic correctness")
+    if spec["authority_granted"] is not False:
+        raise RuntimeError("derivation spec must not grant authority")
+
+    expected_classes = {
+        "authority": "DOGFOOD_AUTHORITY_FIXTURE",
+        "policy": "DOGFOOD_POLICY_FIXTURE",
+        "evidence": "DOGFOOD_EVIDENCE_FIXTURE",
+    }
+    if spec["source_classifications"] != expected_classes:
+        raise RuntimeError("unsupported source classifications in derivation spec")
+
+    expected_mapping = {
+        "allowed_actions_from": "authority.allowed_action",
+        "forbidden_operations_from": "policy.forbidden_operations",
+        "forbidden_target_from": "policy.target",
+        "required_hazard_ids": [],
+        "required_control_ids": [],
+        "required_stop_condition_ids": [],
+    }
+    if spec["mapping"] != expected_mapping:
+        raise RuntimeError("unsupported mapping in derivation spec")
+
+    return spec, "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
 def main() -> int:
+    spec, spec_fingerprint = _load_spec()
     authority, authority_token = _read_json_fixture("authority.json")
     policy, policy_token = _read_json_fixture("policy.json")
     evidence, evidence_token = _read_json_fixture("evidence.json")
 
-    if authority.get("classification") != "DOGFOOD_AUTHORITY_FIXTURE":
+    classes = spec["source_classifications"]
+    if authority.get("classification") != classes["authority"]:
         raise RuntimeError("unexpected authority fixture classification")
-    if policy.get("classification") != "DOGFOOD_POLICY_FIXTURE":
+    if policy.get("classification") != classes["policy"]:
         raise RuntimeError("unexpected policy fixture classification")
-    if evidence.get("classification") != "DOGFOOD_EVIDENCE_FIXTURE":
+    if evidence.get("classification") != classes["evidence"]:
         raise RuntimeError("unexpected evidence fixture classification")
 
     allowed_action = authority.get("allowed_action")
@@ -171,7 +227,9 @@ def main() -> int:
         "baseline_fingerprint": result.baseline_fingerprint,
         "record_fingerprint": result.record_fingerprint,
         "source_snapshots_observed": True,
-        "derivation_method": "dogfood-fixture-baseline-transform@0.1",
+        "derivation_method": f"{spec['spec_id']}@{spec['version']}",
+        "derivation_spec_fingerprint": spec_fingerprint,
+        "transform_conforms_to_declared_spec": True,
         "derived_required_hazard_ids": [],
         "derived_required_control_ids": [],
         "derived_required_stop_condition_ids": [],
