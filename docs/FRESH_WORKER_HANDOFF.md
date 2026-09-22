@@ -134,7 +134,9 @@ Single-Bounce Handoff != Eternal PASS
 
 ## Next stage
 
-A future Observation Gate may bind:
+The next stacked tranche defines a boundary-only Observation Gate in `docs/REKY_BOUNDARY_GATE.md`.
+
+That gate may bind:
 
 - target identity;
 - authority scope;
