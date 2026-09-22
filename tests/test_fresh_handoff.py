@@ -116,3 +116,21 @@ def test_handoff_bindings_are_deterministic():
         declaration, baseline, gate, handoff_id="HANDOFF-PREVIEW-001"
     )
     assert asdict(a) == asdict(b)
+
+
+def test_handoff_does_not_forward_broader_allowed_scope():
+    declaration, baseline, _ = load_inputs()
+    extra = {"operation": "read", "target": "preview"}
+    declaration["understood_allowed_scope"].append(extra)
+    baseline["allowed_actions"].append(extra)
+    gate = evaluate_ky_gate(declaration, baseline)
+    assert gate.outcome == "PASS"
+
+    handoff = compile_fresh_handoff(
+        declaration, baseline, gate, handoff_id="HANDOFF-PREVIEW-001"
+    )
+
+    assert handoff.admitted_actions == [
+        {"operation": "deploy", "target": "preview"}
+    ]
+    assert extra not in handoff.admitted_actions
