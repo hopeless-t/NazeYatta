@@ -111,12 +111,13 @@ def load_handoff(path: str | Path) -> dict[str, Any]:
         raise SafeReadRuntimeError("admitted action must exactly match intended action")
 
     target = intended["target"]
+    target_path = Path(target)
+    if target_path.is_absolute() or ".." in target_path.parts:
+        raise SafeReadRuntimeError("safe-read target must stay beneath the allowed root")
     if not TARGET_RE.fullmatch(target):
         raise SafeReadRuntimeError(
             "safe-read target must be a normalized relative path token"
         )
-    if Path(target).is_absolute() or ".." in Path(target).parts:
-        raise SafeReadRuntimeError("safe-read target must stay beneath the allowed root")
 
     # The runtime adapter structurally validates the handoff but does not authenticate
     # who produced it. Handoff authenticity remains an upstream trust boundary.
