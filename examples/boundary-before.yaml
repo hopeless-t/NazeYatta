@@ -1,4 +1,4 @@
-schema_version: "0.1"
+schema_version: "0.2"
 observation_id: OBS-BEFORE-001
 classification: BOUNDARY_OBSERVATION
 task_id: EX-PREVIEW-DEPLOY
@@ -11,16 +11,19 @@ target_binding:
 
 authority_binding:
   ref: authority://human/preview-only
-  fingerprint: sha256:authority-v1
+  observation_state: OBSERVED
+  binding_token: authority-revision-v1
 
 policy_binding:
   ref: policy://example/preview-deploy
-  fingerprint: sha256:policy-v1
+  observation_state: OBSERVED
+  binding_token: policy-revision-v1
 
 evidence_bindings:
   - ref: evidence://target/preview
+    observation_state: OBSERVED
     state: VERIFIED
-    fingerprint: sha256:target-evidence-v1
+    binding_token: target-evidence-v1
 
 observed_by:
   type: adapter
