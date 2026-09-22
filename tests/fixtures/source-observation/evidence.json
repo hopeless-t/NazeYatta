@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.1",
+  "classification": "DOGFOOD_EVIDENCE_FIXTURE",
+  "evidence_id": "fixture-exists",
+  "supports_claim": "runtime-dogfood fixture exists",
+  "state": "VERIFIED",
+  "target": "runtime-dogfood.txt"
+}
