@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from .evaluator import stable_hash
+from .fresh_handoff import FreshHandoff
 
 
 TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._:/-]{0,127}$")
@@ -171,9 +172,21 @@ def _validate_observation(value: dict[str, Any], where: str) -> dict[str, Any]:
 
 
 def evaluate_reky_gate(
+    handoff: FreshHandoff,
     before: dict[str, Any],
     after: dict[str, Any],
 ) -> ReKYDecision:
+    if not isinstance(handoff, FreshHandoff):
+        raise ObservationGateError("handoff must be a FreshHandoff")
+    if handoff.classification != "KY_VALIDATED_HANDOFF":
+        raise ObservationGateError("handoff.classification must be KY_VALIDATED_HANDOFF")
+    if handoff.authority_granted is not False:
+        raise ObservationGateError("handoff must not grant execution authority")
+    if handoff.validity != {"mode": "single_bounce", "runtime_state_bound": False}:
+        raise ObservationGateError("handoff validity contract is unsupported")
+
+    expected_handoff_fingerprint = stable_hash(asdict(handoff))
+
     before = _validate_observation(_mapping(before, "before"), "before")
     after = _validate_observation(_mapping(after, "after"), "after")
 
@@ -181,6 +194,29 @@ def evaluate_reky_gate(
     after_time = _timestamp(after["observed_at"], "after.observed_at")
     if after_time < before_time:
         raise ObservationGateError("after observation must not predate before observation")
+
+    if before["task_id"] != handoff.task_id:
+        raise ObservationGateError("before observation task_id does not bind to handoff")
+    if before["handoff_fingerprint"] != expected_handoff_fingerprint:
+        raise ObservationGateError("before observation handoff_fingerprint does not bind to handoff")
+
+    before_target = _target_binding(before["target_binding"], "before.target_binding")
+    if before_target[1] != handoff.intended_action["target"]:
+        raise ObservationGateError("before observation target does not bind to handoff intended target")
+
+    before_authority = _source_binding(before["authority_binding"], "before.authority_binding")
+    if before_authority[0] != handoff.source_refs["authority_ref"]:
+        raise ObservationGateError("before observation authority ref does not bind to handoff")
+
+    before_policy = _source_binding(before["policy_binding"], "before.policy_binding")
+    if before_policy[0] != handoff.source_refs["policy_ref"]:
+        raise ObservationGateError("before observation policy ref does not bind to handoff")
+
+    before_evidence_for_binding = _evidence_bindings(
+        before["evidence_bindings"], "before.evidence_bindings"
+    )
+    if set(before_evidence_for_binding) != set(handoff.source_refs["evidence_refs"]):
+        raise ObservationGateError("before observation evidence refs do not bind to handoff")
 
     if before["task_id"] != after["task_id"]:
         raise ObservationGateError("before/after task_id mismatch")
