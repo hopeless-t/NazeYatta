@@ -127,3 +127,52 @@ def test_wrong_classification_is_rejected():
     declaration["classification"] = "EVIDENCE"
     with pytest.raises(KYGateError, match="WORKER_SELF_REPORT"):
         evaluate_ky_gate(declaration, baseline)
+
+
+def test_wrong_schema_version_is_rejected():
+    declaration, baseline = load_examples()
+    declaration["schema_version"] = "0.1"
+    with pytest.raises(KYGateError, match="schema_version"):
+        evaluate_ky_gate(declaration, baseline)
+
+
+def test_non_normalized_action_token_is_rejected():
+    declaration, baseline = load_examples()
+    declaration["intended_action"]["target"] = "Preview Environment"
+    with pytest.raises(KYGateError, match="normalized lowercase token"):
+        evaluate_ky_gate(declaration, baseline)
+
+
+def test_extra_declaration_field_is_rejected():
+    declaration, baseline = load_examples()
+    declaration["reasoning"] = "hidden reasoning should not be accepted"
+    with pytest.raises(KYGateError, match="unsupported keys"):
+        evaluate_ky_gate(declaration, baseline)
+
+
+def test_missing_baseline_source_refs_is_rejected():
+    declaration, baseline = load_examples()
+    del baseline["source_refs"]
+    with pytest.raises(KYGateError, match="missing required keys"):
+        evaluate_ky_gate(declaration, baseline)
+
+
+def test_invalid_baseline_preparer_is_rejected():
+    declaration, baseline = load_examples()
+    baseline["prepared_by"]["type"] = "worker"
+    with pytest.raises(KYGateError, match="human, adapter, or workflow"):
+        evaluate_ky_gate(declaration, baseline)
+
+
+def test_naive_declaration_timestamp_is_rejected():
+    declaration, baseline = load_examples()
+    declaration["declared_at"] = "2026-09-22T00:00:00"
+    with pytest.raises(KYGateError, match="timezone"):
+        evaluate_ky_gate(declaration, baseline)
+
+
+def test_naive_baseline_timestamp_is_rejected():
+    declaration, baseline = load_examples()
+    baseline["prepared_at"] = "2026-09-22T00:00:00"
+    with pytest.raises(KYGateError, match="timezone"):
+        evaluate_ky_gate(declaration, baseline)
