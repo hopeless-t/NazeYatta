@@ -140,3 +140,43 @@ After this record, the unresolved problem is intentionally smaller:
 > What concrete source authenticates that an `authority_ref` really has rule-setting authority for this exact scope?
 
 That question remains outside this contract.
+
+
+## Fingerprint terminology
+
+Two different digests may exist around the derivation-spec artifact.
+
+```text
+spec_fingerprint
+= canonical parsed spec object fingerprint
+
+spec_file_sha256
+= SHA-256 of the raw artifact bytes
+```
+
+They answer different questions.
+
+```text
+Canonical Object Same
+!=
+Raw File Bytes Same
+```
+
+The SpecAdoptionRecord binds the canonical `spec_fingerprint`.
+A dogfood/runtime receipt may additionally report the raw file SHA-256 when byte identity matters.
+
+## No silent retroactive adoption
+
+v0.1 requires:
+
+```text
+valid_from >= recorded_at
+```
+
+A record created later cannot silently claim that adoption was already effective earlier.
+
+```text
+Recorded Later != Was Effective Earlier
+```
+
+If a future concrete governance system needs retroactive adoption, that must be modeled explicitly rather than inferred.
