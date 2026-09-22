@@ -40,6 +40,7 @@ def test_baseline_derivation_dogfood_is_bounded_and_truthful():
 
 
 def test_dogfood_transform_rejects_conflicting_authority_and_policy(tmp_path):
+    import importlib.util
     import shutil
 
     source_template = ROOT / "tests" / "fixtures" / "source-observation"
@@ -51,9 +52,16 @@ def test_dogfood_transform_rejects_conflicting_authority_and_policy(tmp_path):
     policy["allowed_operation"] = "write"
     policy_path.write_text(json.dumps(policy) + "\n", encoding="utf-8")
 
-    # The production dogfood tool intentionally uses the repository fixture root.
-    # Exercise the same bounded source-consistency rule directly here.
-    authority = json.loads((source_root / "authority.json").read_text(encoding="utf-8"))
-    allowed_action = authority["allowed_action"]
+    tool_path = ROOT / "tools" / "dogfood_baseline_derivation.py"
+    spec = importlib.util.spec_from_file_location(
+        "dogfood_baseline_derivation_test_module",
+        tool_path,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.SOURCE_ROOT = source_root
 
-    assert policy["allowed_operation"] != allowed_action["operation"]
+    import pytest
+    with pytest.raises(RuntimeError, match="allowed operations disagree"):
+        module.main()
