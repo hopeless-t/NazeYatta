@@ -105,7 +105,25 @@ The comparator does not invent a stronger state.
 
 ## Chronology and binding
 
-Before/after observations must:
+The comparator receives the actual FreshHandoff object.
+
+It recomputes the handoff fingerprint and requires the **before** observation to bind to:
+
+- the handoff task ID;
+- the actual handoff fingerprint;
+- the intended target;
+- the handoff authority reference;
+- the handoff policy reference;
+- the handoff evidence-reference set.
+
+Only after that cross-stage binding is established does it compare before/after observations.
+
+```text
+Two Matching Fake Observations != Valid Continuation
+Before Snapshot != Handoff -> Reject
+```
+
+Before/after observations must also:
 
 - use the same task ID;
 - bind to the same Fresh Handoff fingerprint;
