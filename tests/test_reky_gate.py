@@ -27,7 +27,7 @@ def load_context():
     return handoff, before, after
 
 
-def test_unchanged_boundary_continues_without_granting_authority():
+def test_unchanged_fully_observed_boundary_continues_without_authority():
     handoff, before, after = load_context()
     result = evaluate_reky_gate(handoff, before, after)
     assert result.outcome == "CONTINUE"
@@ -43,20 +43,67 @@ def test_target_binding_change_requires_reky():
     assert any(r["code"] == "TARGET_BINDING_CHANGED" for r in result.reasons)
 
 
-def test_authority_binding_change_requires_reky():
+def test_authority_binding_token_change_requires_reky():
     handoff, before, after = load_context()
-    after["authority_binding"]["fingerprint"] = "sha256:authority-v2"
+    after["authority_binding"]["binding_token"] = "authority-revision-v2"
     result = evaluate_reky_gate(handoff, before, after)
     assert result.outcome == "RE_KY"
     assert any(r["code"] == "AUTHORITY_BINDING_CHANGED" for r in result.reasons)
 
 
-def test_policy_binding_change_requires_reky():
+def test_policy_binding_token_change_requires_reky():
     handoff, before, after = load_context()
-    after["policy_binding"]["fingerprint"] = "sha256:policy-v2"
+    after["policy_binding"]["binding_token"] = "policy-revision-v2"
     result = evaluate_reky_gate(handoff, before, after)
     assert result.outcome == "RE_KY"
     assert any(r["code"] == "POLICY_BINDING_CHANGED" for r in result.reasons)
+
+
+def test_carried_forward_authority_requires_reky():
+    handoff, before, after = load_context()
+    for obs in (before, after):
+        obs["authority_binding"]["observation_state"] = "CARRIED_FORWARD"
+        obs["authority_binding"]["binding_token"] = None
+    result = evaluate_reky_gate(handoff, before, after)
+    assert result.outcome == "RE_KY"
+    assert any(r["code"] == "AUTHORITY_NOT_OBSERVED" for r in result.reasons)
+
+
+def test_unknown_policy_requires_reky():
+    handoff, before, after = load_context()
+    for obs in (before, after):
+        obs["policy_binding"]["observation_state"] = "UNKNOWN"
+        obs["policy_binding"]["binding_token"] = None
+    result = evaluate_reky_gate(handoff, before, after)
+    assert result.outcome == "RE_KY"
+    assert any(r["code"] == "POLICY_NOT_OBSERVED" for r in result.reasons)
+
+
+def test_carried_forward_evidence_requires_reky():
+    handoff, before, after = load_context()
+    for obs in (before, after):
+        item = obs["evidence_bindings"][0]
+        item["observation_state"] = "CARRIED_FORWARD"
+        item["state"] = "UNKNOWN"
+        item["binding_token"] = None
+    result = evaluate_reky_gate(handoff, before, after)
+    assert result.outcome == "RE_KY"
+    assert any(r["code"] == "EVIDENCE_NOT_OBSERVED" for r in result.reasons)
+
+
+def test_unobserved_source_cannot_carry_fake_binding_token():
+    handoff, before, after = load_context()
+    before["authority_binding"]["observation_state"] = "CARRIED_FORWARD"
+    with pytest.raises(ObservationGateError, match="must be null"):
+        evaluate_reky_gate(handoff, before, after)
+
+
+def test_unobserved_evidence_state_must_be_unknown():
+    handoff, before, after = load_context()
+    before["evidence_bindings"][0]["observation_state"] = "CARRIED_FORWARD"
+    before["evidence_bindings"][0]["binding_token"] = None
+    with pytest.raises(ObservationGateError, match="must be UNKNOWN"):
+        evaluate_reky_gate(handoff, before, after)
 
 
 def test_observer_change_requires_reky():
@@ -72,8 +119,9 @@ def test_evidence_set_change_requires_reky():
     after["evidence_bindings"].append(
         {
             "ref": "evidence://extra",
+            "observation_state": "OBSERVED",
             "state": "VERIFIED",
-            "fingerprint": "sha256:extra",
+            "binding_token": "extra-v1",
         }
     )
     result = evaluate_reky_gate(handoff, before, after)
@@ -81,12 +129,15 @@ def test_evidence_set_change_requires_reky():
     assert any(r["code"] == "EVIDENCE_SET_CHANGED" for r in result.reasons)
 
 
-def test_evidence_fingerprint_change_requires_reky():
+def test_evidence_binding_token_change_requires_reky():
     handoff, before, after = load_context()
-    after["evidence_bindings"][0]["fingerprint"] = "sha256:target-evidence-v2"
+    after["evidence_bindings"][0]["binding_token"] = "target-evidence-v2"
     result = evaluate_reky_gate(handoff, before, after)
     assert result.outcome == "RE_KY"
-    assert any(r["code"] == "EVIDENCE_FINGERPRINT_CHANGED" for r in result.reasons)
+    assert any(
+        r["code"] == "EVIDENCE_BINDING_TOKEN_CHANGED"
+        for r in result.reasons
+    )
 
 
 def test_evidence_degradation_requires_reky():
