@@ -47,9 +47,12 @@ def main() -> int:
         raise RuntimeError("authority fixture allowed_action is malformed")
 
     target = policy.get("target")
+    allowed_operation = policy.get("allowed_operation")
     forbidden_operations = policy.get("forbidden_operations")
     if not isinstance(target, str) or not target:
         raise RuntimeError("policy fixture target is malformed")
+    if not isinstance(allowed_operation, str) or not allowed_operation:
+        raise RuntimeError("policy fixture allowed_operation is malformed")
     if not isinstance(forbidden_operations, list) or not all(
         isinstance(op, str) and op for op in forbidden_operations
     ):
@@ -57,6 +60,10 @@ def main() -> int:
 
     if target != allowed_action["target"]:
         raise RuntimeError("authority and policy fixture targets disagree")
+    if allowed_operation != allowed_action["operation"]:
+        raise RuntimeError("authority and policy fixture allowed operations disagree")
+    if allowed_operation in forbidden_operations:
+        raise RuntimeError("policy fixture both allows and forbids the same operation")
 
     evidence_state = evidence.get("state")
     if evidence_state not in {
