@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.1",
+  "classification": "DOGFOOD_FIXTURE_SOURCE_MANIFEST",
+  "sources": {
+    "authority://dogfood/ci-safe-read-only": {
+      "kind": "authority",
+      "path": "authority.json"
+    },
+    "policy://dogfood/runtime-safe-read-v0-1": {
+      "kind": "policy",
+      "path": "policy.json"
+    },
+    "evidence://dogfood/fixture-exists": {
+      "kind": "evidence",
+      "path": "evidence.json"
+    }
+  }
+}
