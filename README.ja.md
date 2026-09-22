@@ -117,7 +117,7 @@ NazeYattaが役立つのは、複数のAIや自動化処理で、次のような
 - UNKNOWN（不明・未確認） / MISSING（必要な情報がない） / STALE（情報が古い） / VERIFIED（確認済み）を区別したい
 - 同じ作業前チェックのルールを再利用したい
 - コマンドの終了コードを一貫させたい
-- 「何を確認したか」の記録（receipt）を残したい
+- 「何を確認したか」のチェック記録（receipt）を残したい
 - **確認情報・証跡（Evidence）と、実際に作業してよい権限を混ぜたくない**
 
 たとえば：
@@ -132,7 +132,7 @@ NazeYattaが役立つのは、複数のAIや自動化処理で、次のような
 ---
 ## まず1回だけ動かす
 
-Python 3.11+ が必要です。
+Python 3.11以上が必要です。
 
 ~~~bash
 git clone https://github.com/hopeless-t/NazeYatta.git
@@ -144,21 +144,35 @@ python -m pip install -e .
 nazeyatta check examples/publish-photo.yaml
 ~~~
 
-このExampleでは、
+この例では、
 
-~~~text
-publication_permission_verified = UNKNOWN
+> **「この写真を公開してよい許可」が、まだ確認できていない**
+
+という状態を試します。
+
+実際の入力ファイルでは、次のように書かれています。
+
+~~~yaml
+publication_permission_verified: UNKNOWN
 ~~~
 
-です。
+日本語にすると、
 
-同梱されているbaseline ruleは、
+~~~text
+写真の公開許可:
+  UNKNOWN（不明・未確認）
+~~~
 
-> 外部公開には、確認済みの公開許可が必要
+という意味です。
 
-と要求します。
+NazeYattaに同梱されている**基本ルール**では、
 
-そのため結果は：
+> **外部に公開する前に、その公開を許可できる人・組織からの許可が確認済みであること**
+
+を求めています。
+
+そのため、実行すると主要部分は次のように表示されます。
+（実際の出力から説明に必要な部分を抜粋しています）
 
 ~~~text
 NAZEYATTA
@@ -174,13 +188,36 @@ NY-PUB-001  External publication requires verified provenance and permission
 EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
 ~~~
 
-平たく言えば：
+### この表示を日本語で読むと
 
-> **「公開していいことを確認できないので、この事前チェックでは進めてよい扱いにしません。」**
+- **PRE-FLIGHT KY**  
+  「作業前の危険予知チェック」という意味です。  
+  工事前のKY活動のように、作業を始める前に「確認漏れはないか」を見るイメージです。
 
-です。
+- **BLOCK（停止）**  
+  必要な確認が足りないため、**NazeYattaのチェックでは作業開始条件を満たしていない**という判定です。  
+  NazeYatta自身が作業を物理的に止める、という意味ではありません。
 
-安全なread-only例もあります。
+- **hazard**  
+  このルールが想定している危険や問題です。
+
+- **evidence**  
+  今回の判定に使った確認情報・証跡です。
+
+- **effect**  
+  そのルールによって返される判定結果です。
+
+- **EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA**  
+  「NazeYattaは実行権限を与えていません」という意味です。
+
+平たく言えば、
+
+> **この作業は、渡されたルールで必要とされた「公開許可の確認」が足りません。  
+> そのためNazeYattaは「作業開始条件を満たしていない」と判定し、BLOCK（停止）を返します。**
+
+ということです。
+
+ファイルなどを書き換えず、**読み取りだけを行う例**もあります。
 
 ~~~bash
 nazeyatta check examples/safe-read.yaml
@@ -188,15 +225,23 @@ nazeyatta check examples/safe-read.yaml
 
 こちらは PASS（チェック通過）になります。
 
-ただし：
+ただし、
 
 ~~~text
-PASS != Execution Authority
+PASS（チェック通過） ≠ 実行権限の付与
 ~~~
 
-**PASSは「NazeYattaが実行権限を与えた」という意味ではありません。**
+です。
 
-「今回渡された情報とルールでは、この事前チェックに強い停止理由がなかった」という結果です。
+ここでの「≠」は、**「同じ意味ではない」**という意味です。
+
+PASSは、
+
+> **「今回渡された情報とルールでは、この作業前チェックに停止・要確認となる理由がなかった」**
+
+という結果です。
+
+NazeYattaが「この作業を実行してよい」という権限そのものを与えたわけではありません。
 
 ---
 
@@ -204,35 +249,48 @@ PASS != Execution Authority
 
 最初は、小さなYAMLファイル1つで試せます。
 
+YAMLは、設定内容を人にもプログラムにも読みやすく書くためのテキスト形式です。
+
 例：
 
 ~~~yaml
-task_id: MY-FIRST-READ
+task_id: MY-FIRST-READ                  # この作業につける名前
 
 action:
-  operation: read
-  side_effect: none
-  externality: internal
+  operation: read                       # 読み取りを行う
+  side_effect: none                     # ファイルなどを書き換えない
+  externality: internal                 # 外部公開・外部送信をしない
 
 worker:
-  required_capability: read_repository
+  required_capability: read_repository  # Repositoryを読む能力が必要
 
 semantics:
-  critical_meaning_complete: true
+  critical_meaning_complete: true       # 作業内容に重大な曖昧さがない
 
 evidence:
-  worker_capability_qualified: VERIFIED
+  worker_capability_qualified: VERIFIED # 必要な能力があることを確認済み
 ~~~
 
-my-first-task.yaml として保存したら：
+英語のfield名はNazeYattaが機械的に読むための名前です。  
+右側の日本語コメントは、それぞれ何を表しているかの説明です。
+
+この例では説明のために VERIFIED（確認済み）を直接書いていますが、実際の運用では、
+
+> **作業を行うAI自身が、都合よく自分を VERIFIED にする**
+
+ことは想定していません。
+
+人や、信頼できる確認元・自動チェックなどから得た情報を使う想定です。
+
+この内容を my-first-task.yaml として保存したら：
 
 ~~~bash
 nazeyatta check my-first-task.yaml
 ~~~
 
-NazeYattaには小さなgeneric baseline policyが同梱されているので、**最初の1回を動かすためにpolicy fileまで自作する必要はありません。**
+NazeYattaには**基本ルールが最初から同梱**されているので、最初の1回を動かすためにルール用の設定ファイル（policy file）まで自作する必要はありません。
 
-大づかみに言えば、
+大まかに言えば、
 
 ~~~text
 何をしたいか
@@ -242,31 +300,48 @@ NazeYattaには小さなgeneric baseline policyが同梱されているので、
 適用されるルール
 ~~~
 
-を照合して、結果とreceiptを返します。
+を照合して、判定結果と**チェック記録（receipt）**を返します。
 
 ---
 
 ## 何が返ってくるの？
 
-現在の主な結果は：
+現在の主な判定結果は：
 
-- PASS
-- CAUTION
-- REVIEW
-- EVIDENCE_REQUIRED
-- BLOCK
+- **PASS（チェック通過）**
+- **CAUTION（注意）**
+- **REVIEW（要確認）**
+- **EVIDENCE_REQUIRED（確認情報・証跡が必要）**
+- **BLOCK（停止）**
 
 です。
 
-CLIでは PASS の時だけ終了コード 0 を返します。
+コマンドライン（CLI）では、PASSの時だけ終了コード 0 を返します。
 
-JSONでも受け取れます。
+プログラムから扱いやすいJSON形式でも結果を受け取れます。
 
 ~~~bash
 nazeyatta check examples/safe-read.yaml --json
 ~~~
 
-receiptには、何を評価したか後から確認できるよう、fingerprintや評価結果が含まれます。
+チェック記録（receipt）には、判定結果だけでなく、
+
+- どの作業内容を評価したか
+- どのルールを使ったか
+- どの評価器versionを使ったか
+- どの確認情報の方式を使ったか
+
+などが含まれます。
+
+また、作業内容とルールには **fingerprint（識別用のハッシュ値）** が付きます。
+
+fingerprintは、
+
+> **「前に評価した内容と、今回の内容が同じものか」を後から照合しやすくするための識別値**
+
+です。
+
+fingerprintだけで「誰がその内容を作ったか」や「その内容が正しいか」まで証明するものではありません。
 
 ---
 
