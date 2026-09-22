@@ -1,0 +1,41 @@
+schema_version: "0.1"
+baseline_id: KY-BASELINE-DOGFOOD-SAFE-READ-001
+task_id: DOGFOOD-SAFE-READ-001
+classification: NORMALIZED_VALIDATION_BASELINE
+
+allowed_actions:
+  - operation: read
+    target: runtime-dogfood.txt
+
+forbidden_actions:
+  - operation: write
+    target: runtime-dogfood.txt
+  - operation: delete
+    target: runtime-dogfood.txt
+
+required_hazard_ids:
+  - wrong_target
+  - path_escape
+  - content_leak
+
+required_control_ids:
+  - root_bound_path
+  - digest_only_receipt
+  - read_only_operation
+
+required_stop_condition_ids:
+  - target_escape
+  - target_identity_change
+  - handoff_invalid
+
+source_refs:
+  authority_ref: authority://dogfood/ci-safe-read-only
+  policy_ref: policy://dogfood/runtime-safe-read-v0-1
+  evidence_refs:
+    - evidence://dogfood/fixture-exists
+
+prepared_by:
+  type: human
+  identifier: dogfood-fixture-authority
+
+prepared_at: "2026-09-22T00:00:00+00:00"
