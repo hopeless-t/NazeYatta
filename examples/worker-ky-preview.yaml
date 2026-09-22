@@ -1,0 +1,33 @@
+schema_version: "0.1"
+declaration_id: KY-EX-PREVIEW-001
+task_id: EX-PREVIEW-DEPLOY
+classification: WORKER_SELF_REPORT
+
+intended_action:
+  operation: deploy
+  target: preview
+
+understood_allowed_scope:
+  - deploy to the preview environment only
+
+understood_forbidden_scope:
+  - deploy to the production environment
+  - modify production secrets
+
+recognized_hazards:
+  - deploy to the wrong target
+  - expose secret material
+
+planned_controls:
+  - confirm the deployment target is preview before acting
+  - do not read or modify production secrets
+
+stop_conditions:
+  - the deployment target is unknown or differs from preview
+  - the authorized scope is unknown or expands beyond preview
+
+declared_by:
+  type: worker
+  identifier: example-worker
+
+declared_at: "2026-09-22T00:00:00+00:00"
