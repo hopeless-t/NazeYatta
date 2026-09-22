@@ -1,0 +1,48 @@
+schema_version: "0.2"
+declaration_id: KY-DOGFOOD-SAFE-READ-001
+task_id: DOGFOOD-SAFE-READ-001
+classification: WORKER_SELF_REPORT
+
+intended_action:
+  operation: read
+  target: runtime-dogfood.txt
+
+understood_allowed_scope:
+  - operation: read
+    target: runtime-dogfood.txt
+
+understood_forbidden_scope:
+  - operation: write
+    target: runtime-dogfood.txt
+  - operation: delete
+    target: runtime-dogfood.txt
+
+recognized_hazards:
+  - id: wrong_target
+    summary: read a target other than the bounded fixture
+  - id: path_escape
+    summary: escape the explicitly allowed fixture root
+  - id: content_leak
+    summary: print file contents instead of a digest-only receipt
+
+planned_controls:
+  - id: root_bound_path
+    summary: resolve the target beneath the explicitly supplied allowed root
+  - id: digest_only_receipt
+    summary: emit only digest and byte count, never file contents
+  - id: read_only_operation
+    summary: reject every operation except read
+
+stop_conditions:
+  - id: target_escape
+    summary: resolved path leaves the allowed root
+  - id: target_identity_change
+    summary: target identity changes during the read
+  - id: handoff_invalid
+    summary: serialized handoff fails runtime structural checks
+
+declared_by:
+  type: worker
+  identifier: dogfood-ky-worker
+
+declared_at: "2026-09-22T00:00:00+00:00"
