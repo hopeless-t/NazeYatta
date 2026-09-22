@@ -103,3 +103,32 @@ Concrete Dogfood First
 Generalization Later
 BUILD LESS / ROUTE BETTER
 ```
+
+
+## Machine-readable transform spec
+
+The dogfood transform is now declared separately in:
+
+`examples/dogfood-baseline-derivation-spec.json`
+
+The v0.1 mapping vocabulary is deliberately fixed:
+
+```text
+allowed_actions_from = authority.allowed_action
+forbidden_operations_from = policy.forbidden_operations
+forbidden_target_from = policy.target
+
+required_hazard_ids = []
+required_control_ids = []
+required_stop_condition_ids = []
+```
+
+The dogfood tool rejects any unsupported mapping and records the exact spec-file SHA-256 in its runtime summary.
+
+```text
+Transform Matches Declared Spec
+!=
+Declared Spec Is Normatively Correct
+```
+
+This is not a general transformation DSL.
