@@ -1,0 +1,2 @@
+NazeYatta runtime dogfood fixture.
+This file is intentionally boring and read-only.
