@@ -2,31 +2,108 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-**NazeYattaは、AIや自動ツールに仕事をさせる前の「チェック係」です。**
+**NazeYattaは、AIや自動化が何かを実行する前に使う、小さなコマンドラインの「事前チェック係」です。**
 
-たとえば「この写真を公開して」という作業でも、公開してよいことが確認できていなければ `BLOCK` します。確認できた条件については `PASS` / `REVIEW` / `BLOCK` などの結果と、何を確認したかの記録を返します。
+見るのは、まず一つだけです。
 
-NazeYatta自身が仕事を実行するわけではありません。**実行前に、いったん確認するための道具**です。
+> **この作業を始める前に、必要な確認は本当に揃っているか？**
 
-```text
-あなた / Planner
-      ↓
-「この作業をしたい」
-      ↓
+確認できていないものを、NazeYattaは「たぶん大丈夫」に変えません。
+
+たとえば：
+
+~~~text
+やりたいこと:
+  この写真を公開する
+
+今わかっていること:
+  公開先を確認した                 VERIFIED
+  Workerの能力を確認した           VERIFIED
+  公開してよい許可                 UNKNOWN
+
+ルール:
+  外部公開には、確認済みの公開許可が必要
+
+NazeYatta:
+  BLOCK
+~~~
+
+NazeYatta自身が写真を公開するわけではありません。  
+NazeYatta自身が「公開してよい」という権限を与えるわけでもありません。
+
+**実行前の確認をして、その結果を記録して返すだけ**です。
+
+---
+
+## 30秒で掴む全体像
+
+~~~text
+何かを実行したい
+      |
+      v
+やりたい作業 + 今わかっている事実
+      |
+      v
    NazeYatta
-      ↓
- PASS / REVIEW / BLOCK
-      ↓
-実際に進めるかは別の権限者が決める
-```
+   ルールと照合
+      |
+      v
+PASS / REVIEW / BLOCK
++ 何を確認したかの記録
+      |
+      v
+別のHuman / Worker / Harnessが
+実際に進めるか判断・実行する
+~~~
 
-これはalpha段階のresearch toolです。Certification・導入実績・Authority Granting Systemを主張するものではありません。
+イメージとしては、
 
-## まず1回動かす
+> **機械が読める「作業前チェックリスト」**
+
+に近いです。
+
+特に、
+
+~~~text
+「確認できなかった」
+        ↓
+「まあ大丈夫だろう」
+~~~
+
+へ勝手に変換してほしくない時に使います。
+
+---
+
+## これ、本当に必要？
+
+場合によります。
+
+小さなスクリプト1本と単純な if 文だけで十分なら、**その if 文を使った方がいい**です。
+
+NazeYattaが役立つのは、複数のAI Workerや自動処理で、次のような境界を共通化したい時です。
+
+- UNKNOWN / MISSING / STALE / VERIFIED を明示したい
+- 同じ事前チェックのルールを再利用したい
+- CLIの終了コードを一貫させたい
+- 「何を確認したか」のreceiptを残したい
+- **Evidenceと実行権限を混ぜたくない**
+
+例：
+
+- git push の前
+- ファイルやresourceを削除・置換する前
+- コンテンツを外部公開する前
+- 外部へ書き込む前
+- 資格確認が必要なCapabilityを使う前
+- 操作対象が本当に正しいか確認したい時
+
+---
+
+## まず1回だけ動かす
 
 Python 3.11+ が必要です。
 
-```bash
+~~~bash
 git clone https://github.com/hopeless-t/NazeYatta.git
 cd NazeYatta
 python -m venv .venv
@@ -34,13 +111,25 @@ python -m venv .venv
 python -m pip install -e .
 
 nazeyatta check examples/publish-photo.yaml
-```
+~~~
 
-このExampleは「外部へ公開したい」という作業です。しかし、公開してよいことがまだ確認できていません。
+このExampleでは、
 
-そのため、次のように `BLOCK` します。
+~~~text
+publication_permission_verified = UNKNOWN
+~~~
 
-```text
+です。
+
+同梱されているbaseline ruleは、
+
+> 外部公開には、確認済みの公開許可が必要
+
+と要求します。
+
+そのため結果は：
+
+~~~text
 NAZEYATTA
 👈😽 PRE-FLIGHT KY
 
@@ -52,342 +141,213 @@ NY-PUB-001  External publication requires verified provenance and permission
   effect: BLOCK
 
 EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
-```
+~~~
 
 平たく言えば：
 
-> **「公開していいか分からないので、勝手に進めません。」**
+> **「公開していいことを確認できないので、この事前チェックでは進めてよい扱いにしません。」**
 
 です。
 
-表示はふざけています。**Evidenceはふざけていません。**
+安全なread-only例もあります。
 
-## どんな時に使うの？
+~~~bash
+nazeyatta check examples/safe-read.yaml
+~~~
 
-AI Workerや自動ツールに、たとえば次のような作業をさせる前です。
+こちらは PASS になります。
 
-- ファイルを削除・変更する
-- `git push` など外部へ書き込む
-- コンテンツを公開する
-- Permission / Capability / Target / Evidenceの確認が必要な操作をする
-- `UNKNOWN`を「たぶん大丈夫」に勝手に変えてほしくない
+ただし：
 
-## 結果はどう読むの？
+~~~text
+PASS != Execution Authority
+~~~
 
-- `PASS` — 今回渡されたTask / Policy / Evidenceについて、このPreflightを通過した
-- `REVIEW` / `EVIDENCE_REQUIRED` / `CAUTION` — 確認やEvidenceが足りないので、そのまま進めない
-- `BLOCK` — 今回渡された状態では、そのActionを止める
+**PASSは「NazeYattaが実行権限を与えた」という意味ではありません。**
 
-CLIでは `PASS` だけがexit status `0`です。それ以外はnon-zeroです。
+「今回渡された情報とルールでは、この事前チェックに強い停止理由がなかった」という結果です。
 
-一番大事なのはこれです。
-
-```text
-KY PASS != Authority Granted
-```
-
-**`PASS`は「実行してよい」という権限そのものではありません。** 実際に実行するかは、Human / Planner / Harnessなど、別のAuthorized Control Pointが決めます。
+---
 
 ## NazeYattaには何を渡すの？
 
-作業内容を小さなYAMLファイルで渡します。
+最初は、小さなYAMLファイル1つで試せます。
 
-最初は「Repositoryを読むだけ」なら、この程度です。
+例：
 
-```yaml
+~~~yaml
 task_id: MY-FIRST-READ
+
 action:
   operation: read
   side_effect: none
   externality: internal
+
 worker:
   required_capability: read_repository
+
 semantics:
   critical_meaning_complete: true
+
 evidence:
   worker_capability_qualified: VERIFIED
-```
+~~~
 
-`my-first-task.yaml`として保存して：
+my-first-task.yaml として保存したら：
 
-```bash
+~~~bash
 nazeyatta check my-first-task.yaml
-```
+~~~
 
-と実行します。
+NazeYattaには小さなgeneric baseline policyが同梱されているので、**最初の1回を動かすためにpolicy fileまで自作する必要はありません。**
 
-### 誰がその情報を書いていいの？
+大づかみに言えば、
 
-v0.1-alphaでは、ここを保守的に扱います。
+~~~text
+何をしたいか
++
+今わかっていること
++
+適用されるルール
+~~~
 
-- task / action / data の事実は、上流のHuman / Planner / Task Specification / trusted Adapterから供給する
-- evidenceは、そのWorkflowで適切なHuman / trusted Adapter / Evidence Sourceから供給する
-- 実行したいWorker自身が、自分に都合のよい`VERIFIED`を製造してはいけない
-- NazeYattaは渡された構造・関連・policy conditionを評価するが、現実世界で「誰がそのEvidenceを主張してよいか」まで独立に認証するものではない
-
-```text
-Worker Self-Declaration != Evidence
-Producer Identity != Evidence Authority
-```
-
-## 次に読むなら
-
-まず安全なExampleを試したい場合：
-
-```bash
-nazeyatta check examples/safe-read.yaml
-nazeyatta check examples/destructive-delete.yaml
-nazeyatta check examples/provenance-qualified-safe-read.yaml
-nazeyatta check examples/provenance-claim-mismatch.yaml
-nazeyatta debrief-template NY-LIVE-001
-```
-
-ここから下は、設計思想・Evidence・KY・現在の研究状態を詳しく説明します。
+を照合して、結果とreceiptを返します。
 
 ---
 
-> **AI Workerは「ルールを理解しました」と言った。**  
-> **そのあと、なぜかそのルールで禁止したことをそのままやった。**
->
-> 🙏 お願いです。指示通り働いてください。
+## 何が返ってくるの？
 
-NazeYattaは、AI WorkerやSoftware Agent向けの、実験的な**作業前危険予知（Preflight Hazard Analysis）＋違反振り返り（Violation Debrief）ツール**です。
+現在の主な結果は：
 
-作業前に今回重要なルールと危険を少数だけ前景化し、機械的に確認できる要求はEvidenceと照合し、違反が観測されたら「なぜやった？」から始まるStructured Debriefへつなげます。
+- PASS
+- CAUTION
+- REVIEW
+- EVIDENCE_REQUIRED
+- BLOCK
 
-```text
-👈😽  「この危険を認識しました」
-        !=
-✅😺  「Evidence上、実際に遵守されました」
-```
+です。
 
-この二つが食い違ったら：
+CLIでは PASS の時だけ終了コード 0 を返します。
 
-```text
-🙅‍♂️😿 VIOLATION
+JSONでも受け取れます。
 
-🫵😿❓
-NAZE YATTA?
-（なぜやった？ / 何が起きた？）
-```
+~~~bash
+nazeyatta check examples/safe-read.yaml --json
+~~~
 
-## 現在のalpha状態
+receiptには、何を評価したか後から確認できるよう、fingerprintや評価結果が含まれます。
 
-### v0.1-alpha + v0.2 provenance input lane
+---
 
-**現在実装済み：** deterministic YAML preflight evaluation、明示的なEvidence State model、保守的なCLI exit status、receipt fingerprint、structured violation-debrief template。
+## NazeYattaではないもの
 
-**v0.2 provenance input lane：** `schema_version: "0.2"` では、既存policy keyを変えずに `task.evidence` のclaim keyからEvidence Record IDを参照し、`evidence_records` の `evidence_id`、`supports_claim`、`observed_at`、`observer.type`、正規化済み `verification.state` を保守的に解決する。欠落は`MISSING`、不整合は`INVALID`であり、勝手に`VERIFIED`にはならない。旧v0.1のscalar evidenceも互換性のため残るが、receiptでは`legacy-v0.1`と表示され、provenance-qualified evidenceではない。
+NazeYattaは次のものではありません。
 
-**意図的に未実装：** task YAMLの生成、provenance adapter、runtime observation、live traceとのviolation detection、automatic enforcement。NazeYattaはrecord形状・claim linkを評価するが、誰が`VERIFIED`をassertしてよいかをauthenticate/authorizeするものではありません。
+- 作業そのものを実行するAI Worker
+- 実行engine
+- 権限を発行するauthority
+- certification system
+- 完成した万能policy platform
+- 自動remediation system
+- Evidence Sourceが本当に正しい人・機械だったと証明する仕組み
+- end-to-endの自動enforcement
 
-## どう動くの？
+現在のalphaは、**渡されたTask / Evidence構造とPolicy条件をdeterministicに評価する道具**です。
 
-```mermaid
-flowchart TB
-    A[BEFORE]
-    B["👈😽 KY<br/>(危険予知 / Kiken Yochi / Hazard Anticipation)"]
-    C[EXECUTION]
-    D["👀 OBSERVATION<br/>(runtime evidence)"]
+大きな影響を持つ操作では、Workerが回避できない別のenforcement pointを使ってください。
 
-    A --> B --> C --> D
-    D --> E["✅😺 COMPLIED"]
-    D --> F["🙅‍♂️😿 VIOLATED"]
-    F --> G["🫵😿❓ NAZE YATTA?<br/>(なぜやった？ / 何が起きた？)"]
-```
-
-現在の`v0.1-alpha`が実装しているのは、主に**Mandatory Ruleの決定論的Preflight lane**と**Structured Debrief Template**です。Runtime Observation AdapterやWorker自身によるSituational KY生成は、現時点では自動のend-to-end enforcementとしては未実装です。
-
-## KY / 危険予知とは
-
-ここでいう**KYは「危険予知（Kiken Yochi）」**です。
-
-日本の建設・製造・運輸などの現場で使われてきた、作業前に「今回の作業にはどんな危険があるか」を考える安全活動から着想を得ています。
-
-重要なのは、どこかのManualにSafety Ruleが存在することだけではありません。
-
-**実際に行動する直前に、今回重要な危険がWorkerの注意領域にあること。**
-
-関連する「指差し呼称」も、対象を見る・指す・状態を確かめる・声に出す、という確認機構に意味があります。
-
-対象を見ずに指だけ差して「ヨシ！」と言えば、Controlは単なる儀式になってしまいます。
-
-> **The ritual is not the control.**  
-> **儀式はControlではない。**
-
-NazeYattaはKYから**着想を得ています**が、労働安全システム、Safety Certification、専門的な安全工学の代替ではありません。
+---
 
 ## なぜ「NazeYatta」なの？
 
-**Naze yatta?（なぜやった？）** は、そのまま英語にすれば：
+**なぜやった？**
 
-> **Why did you do that?**
+名前の由来は、AI Workerで時々起きるこの現象です。
 
-です。
+~~~text
+Human:
+  「Xはやらないで」
 
-この名前は、AI Workerを使っていて何度も遭遇した流れから来ています。
+AI:
+  「了解しました。Xはしません」
 
-1. こちらがルールを説明する。
-2. Workerが正しく復唱する。
-3. Workerが「そのルールを守ります」と言う。
-4. そして、そのルールをそのまま破る。
+AI:
+  Xを実行
+~~~
 
-そこで自然に出てくるのが：
+そこで、
 
-> **「お前さっき、それやらないって言ったよね？ 何が起きた？」**
+> **実行する前に、何が確認済みでなければならなかったのか？**
 
-です。
+を機械的に確認しよう、というのがNazeYattaの出発点です。
 
-ただし、AIへ「なぜやった？」と聞いて返ってきた説明をRoot Causeとは扱いません。
+猫だらけの表示は意図的にふざけています。  
+その下のresult semanticsはふざけていません。
 
-```text
-Worker Explanation != Root Cause
-```
+---
 
-「なぜやった？」は**調査の開始**です。Workerの説明は`WORKER_SELF_REPORT`として保存し、Observed Behavior、Trace、Policy、Environment State、Reviewer Evidenceなどと比較します。
+## 詳しい設計はどこ？
 
-## なぜ猫なの？ 🐈
+**最初のExampleを動かすだけなら、ここから先の概念を理解する必要はありません。**
 
-日本のTraditionalな伝統において、古来より猫は労働者を象徴する存在として広く認識されてきた――
+必要になった時だけ読めます。
 
-**というEvidenceは一切ありません。捏造です。引用しないでください。**
+- [Semantics](docs/SEMANTICS.md) — Policy != Evidence、Evidence != Authority、stateと境界
+- [Evidence Model](docs/EVIDENCE_MODEL.md) — Evidence Record、provenance、freshness
+- [Policy Model](docs/POLICY_MODEL.md) — applicabilityとpolicy effect
+- [Threat Model](docs/THREAT_MODEL.md) — 何が壊れ得ると仮定しているか
+- [Roadmap](docs/ROADMAP.md) — 実装済み・研究中・意図的に後回しにしたもの
+- [Violation Debrief](docs/VIOLATION_DEBRIEF.md) — 違反後の振り返り構造
+- [日本語 First Steps](docs/FIRST_STEPS.ja.md) — さらに手順寄りの導入
 
-本当の理由はもっと単純です。
+---
 
-猫の絵文字は状態を一目で区別しやすく、覚えやすく、そして「さっき注意すると言ったルールをWorkerが破った」という悲しい出来事を、ほんの少しだけ楽しくしてくれます。
+## 現在の状態
 
-```text
-👈😽 PRE-FLIGHT KY
-🔎😼 VERIFY
-⚠️😼 CAUTION
-📋😾 EVIDENCE REQUIRED
-❓🐈 UNKNOWN
-🔁👀 RECHECK
-✋😾 BLOCK
-🚫😾 DENY
-🙅‍♂️😿 VIOLATION
-🫵😿❓ DEBRIEF
-✅😺 PASS
-```
+NazeYattaは **alpha research tool** です。
 
-**猫はふざけています。Semanticsはふざけていません。**
+現在実装されているもの：
 
-絵文字はPresentation Conventionであって、EvidenceでもAuthorityでもありません。
+- deterministic YAML preflight evaluation
+- generic baseline rules
+- explicit evidence states
+- conservative CLI exit code
+- JSON / human-readable receipt
+- task / policy fingerprint
+- provenance-linked v0.2 input lane
+- violation-debrief template
+- tests / examples
 
-## Core Invariants
+まだend-to-endで自動化していないもの：
 
-```text
-Rules Available != Rules Attended
-Rule Acknowledgement != Rule Compliance
-Worker Explanation != Root Cause
-KY Completed != Authority to Execute
-KY PASS != Authority Granted
+- Taskそのものの自動生成
+- runtime observation adapter
+- live execution enforcement
+- provenance sourceの自動認証
+- automatic remediation
+- authority generation
+
+最後に、この4本だけ覚えれば十分です。
+
+~~~text
 Unknown != Safe
 Worker Self-Declaration != Evidence
-Document Author != Field Authority
-Producer Identity != Evidence Authority
-Provenance Present != Authority Proven
-Evidence VERIFIED != Execution Authority
-Artifact != Evidence
-Familiar Task != Same State
-Past Success != Current Safety
-Missing Rule != Permission
-Hazard Detected != Automatic Remediation Authority
-Preflight Pass != Eternal Pass
-```
-
-`UNKNOWN`はすべてのWorkflowで自動的に`DENY`を意味するわけではありません。
-
-重要なのは、**不足している観測を、Workerに都合のよい事実へ勝手に変換しないこと**です。UNKNOWNにどんなoperational effectを与えるかはPolicy側が決めます。
-
-Generative Discoveryは注意領域を広げてもよい。Authoritative Requirementを狭めてはいけません。
-
-## 現在の実装状況
-
-### v0.1-alphaで実装済み
-
-- 機械的に評価できる範囲でのdeterministic YAML rule evaluation
-- Generic 10-rule baseline policy bundle
-- Evidence Stateの明示的取扱い
-- v0.2 Evidence Record reference resolution（v0.1 compatibility receiptを明示）
-- Task / Policy fingerprint付きPreflight Receipt
-- `PASS`だけをexit `0`とする保守的CLI
-- Naze-Yatta Debrief Template
-- Examples / Tests
-
-### Experimental Design：まだ自動end-to-end enforcementではないもの
-
-- 通常3件・高リスク最大5件というKY attention model
-- Worker自身によるSituational Hazard Discovery
-- Runtime Observation Adapter
-- Live Tool TraceとのViolation照合
-- TOCTOU / Receipt Freshnessの自動Re-check
-- Observed Violationに基づくQualification Update
-
-詳しくは[`docs/ROADMAP.md`](docs/ROADMAP.md)を参照してください。
-
-## Evidence・Authority・Completion
-
-NazeYattaでは、Evidenceを少なくとも**「何を主張するのか」「何を観測したのか」「その観測はどこから来たのか」**に結び付け、必要に応じて時点・状態も扱います。v0.2 laneはrecord形状とclaim linkageを確認しますが、observerの現実世界でのAuthority自体を証明するものではありません。詳しくは[`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md)。
-
-`PASS`はAuthorityを製造しません。
-
-```text
-KY PASS != Authority Granted
-```
-
-そしてTask Contract上、CompletionでControlをHuman / Planner / Reviewerなどへ返すなら：
-
-```text
-🏁 Completion reported
-        ↓
-      ✋😾 STOP
-```
-
-**Helpful != Authorized.**
-
-## Limitations
-
-NazeYattaは、AI Workerが必ず指示通り動くことを保証しません。PreflightだけではComplianceを強制できません。
-
-高ImpactなActionでは、Worker自身がbypassできないExternal Runtime Gateと組み合わせてください。
-
-NazeYattaは以下ではありません。
-
-- Safety Certification System
-- 法令・規格適合保証
-- 労働安全の代替
-- Authority Granting System
-- Autonomous Policy Generator
-- Automatic Remediation Engine
-- OPA/Cedar等のFull Policy Engineの代替
-
-## Deep Docs
-
-- [`docs/PHILOSOPHY.ja.md`](docs/PHILOSOPHY.ja.md) — なぜこれを作ったのか
-- [`docs/SEMANTICS.md`](docs/SEMANTICS.md) — Stateと区別
-- [`docs/POLICY_MODEL.md`](docs/POLICY_MODEL.md) — Policy / Applicability / Effect
-- [`docs/EVIDENCE_MODEL.md`](docs/EVIDENCE_MODEL.md) — EvidenceとFreshness
-- [`docs/VIOLATION_DEBRIEF.md`](docs/VIOLATION_DEBRIEF.md) — DebriefとFailure Taxonomy
-- [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) — Threat Model
-- [`docs/FIRST_STEPS.ja.md`](docs/FIRST_STEPS.ja.md) — OSSを初めて触る人向け
-
-## OSSを初めて触る方へ
-
-NazeYattaは、OSSやCLIに詳しい人だけのためのプロジェクトではありません。
-
-AIを使い始めて「どうして指示した通りに動かないんだろう？」と思ったことがあるなら、この問題はすでにあなたにも関係しています。
-
-READMEを読む、Issueを眺める、安全なExampleを実際に動かしてみる——どれもOSSへ触れる立派な第一歩です。
-
-分からない言葉があったら、それもDocumentationの改善候補かもしれません。
-
-初めての方は[`docs/FIRST_STEPS.ja.md`](docs/FIRST_STEPS.ja.md)へどうぞ。
+Evidence != Authority
+PASS != Execution Authority
+~~~
 
 ## Contributing
 
-[`CONTRIBUTING.md`](CONTRIBUTING.md)を参照してください。
+[CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+
+もし「何が分からないのかすら分からない」状態になったら、それ自体が重要なdocumentation bugの証拠です。
+
+そのままIssueへ：
+
+> **「何を見ているのか分からない」**
+
+と書いてもらって構いません。
 
 ## License
 
-Apache-2.0. [`LICENSE`](LICENSE)を参照してください。
+Apache-2.0. [LICENSE](LICENSE) を参照してください。
