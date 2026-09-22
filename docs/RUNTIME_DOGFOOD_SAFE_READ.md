@@ -1,26 +1,16 @@
-# Runtime Dogfood: Fresh Safe-Read v0.1
+# Runtime Dogfood: Fresh Safe-Read v0.2
 
 Status:
 
 ```text
-TYPE = PARTIAL RUNTIME DOGFOOD
+TYPE = PARTIAL RUNTIME DOGFOOD + FAIL-CLOSED RE-KY EXERCISE
 GENERAL EXECUTOR = NOT IMPLEMENTED
 SANDBOX = NOT CLAIMED
-SOURCE BINDING OBSERVATION = NOT IMPLEMENTED
-FULL RE-KY RUNTIME CONTINUE = NOT CLAIMED
+SOURCE-SPECIFIC OBSERVATION ADAPTERS = NOT IMPLEMENTED
+POSITIVE RUNTIME CONTINUE = NOT CLAIMED
 ```
 
-## Purpose
-
-Exercise the first real runtime path without introducing a general execution engine.
-
-The operation is intentionally boring:
-
-```text
-read one harmless fixture file
-```
-
-The runtime path is:
+## Runtime path
 
 ```text
 WorkerKYDeclaration
@@ -30,9 +20,26 @@ WorkerKYDeclaration
 -> fresh Python subprocess
 -> bounded read-only adapter
 -> RuntimeExecutionReceipt
+-> BoundaryObservation v0.2
+-> Re-KY Gate
+-> RE_KY
 ```
 
-The Fresh Worker receives only:
+The final `RE_KY` is intentional.
+
+The target path is actually observed by the read adapter, but authority/policy/evidence source bindings have no runtime adapters yet.
+
+They are therefore represented as:
+
+```text
+observation_state = CARRIED_FORWARD
+binding_token     = null
+evidence state    = UNKNOWN
+```
+
+The Re-KY Gate correctly refuses `CONTINUE`.
+
+## What the Fresh Worker receives
 
 - serialized FreshHandoff;
 - explicitly supplied allowed filesystem root.
@@ -46,94 +53,72 @@ It does not receive:
 
 ## Adapter boundary
 
-The worker accepts only:
+The Worker accepts only `operation = read`.
 
-```text
-operation = read
-```
-
-The logical target must be a relative path beneath the allowed root.
-
-The adapter resolves the path before reading and rejects a path or symlink that escapes the allowed root.
+The logical target must resolve beneath the allowed root. Parent traversal and symlink escape are rejected.
 
 ```text
 Allowed Root Check != OS Sandbox
 Fresh Process != Sandbox
 ```
 
-No shell command, write, delete, or network adapter is implemented.
+No shell, write, delete, or network adapter exists.
 
-## Receipt
+## Runtime receipt
 
-The runtime receipt contains:
+The receipt includes:
 
 - task ID;
-- compiled handoff fingerprint;
-- operation / logical target;
-- SHA-256 of file contents;
-- bytes read;
-- target identity fingerprints before/after the read;
-- Worker process ID;
+- handoff fingerprint;
+- operation / target;
+- SHA-256 content digest;
+- byte count;
+- before/after target identity fingerprints;
+- Worker PID;
 - outcome;
 - `authority_granted = false`.
 
-It deliberately does not include file contents.
+File contents are not included.
 
-## Fresh-process evidence
-
-The dogfood orchestrator compares its own PID with the runtime receipt's Worker PID.
-
-Different PIDs demonstrate a separate process was spawned.
+## Observation truth boundary
 
 ```text
-Different PID = Separate Process
-Different PID != Security Sandbox
+target_identity               = OBSERVED
+authority source              = CARRIED_FORWARD
+policy source                 = CARRIED_FORWARD
+evidence source               = CARRIED_FORWARD
+source_bindings_observed      = false
+reky_runtime_evaluated        = true
+reky_runtime_outcome          = RE_KY
+full CONTINUE claimed         = false
 ```
 
-## Important observation limitation
-
-This dogfood can directly observe the target path/file identity.
-
-It cannot yet truthfully observe runtime fingerprints for:
-
-- authority source;
-- policy source;
-- evidence sources.
-
-FreshHandoff currently carries references to those sources, but no source-specific runtime adapter exists.
-
-Therefore this tranche does **not** claim a positive full-runtime Re-KY `CONTINUE` result.
+This is stronger than the v0.1 dogfood because the Re-KY path is now actually exercised without inventing source fingerprints.
 
 ```text
-Partial Runtime Dogfood != Full Observation E2E
+Runtime RE_KY PASS != Full Observation E2E
 Ref Hash != Source Fingerprint
 Carried Forward != Observed
 ```
 
-See #20 for the unresolved source-binding observation design.
-
 ## CI
 
-The dedicated GitHub Actions dogfood job runs the orchestrator on Python 3.11 after the normal test matrix succeeds.
+The dedicated GitHub Actions dogfood job runs the orchestration on Python 3.11 after the normal 3.11 / 3.12 test matrix.
 
-The normal Python 3.11 / 3.12 test matrix also includes negative runtime tests:
+Negative runtime tests still cover:
 
-- write operation rejected;
-- `..` escape rejected;
-- symlink escape rejected;
-- unexpected handoff fields rejected;
-- file contents absent from runtime receipt/log output.
+- write rejection;
+- parent traversal rejection;
+- symlink escape rejection;
+- unexpected handoff field rejection;
+- no file-content leakage into receipt/log output.
 
-## Truth boundary
+## Next honest milestone
 
-A successful dogfood demonstrates only:
+A future positive `CONTINUE` requires real source adapters (or another explicitly authorized source-observation mechanism) that can produce current binding tokens for authority, policy, and evidence sources.
+
+Until then:
 
 ```text
-typed KY
--> deterministic validation
--> bounded handoff
--> separate-process fixture read
--> digest-only execution receipt
+Unobserved Critical Source -> RE_KY
 ```
-
-It does not demonstrate production filesystem safety, source authentication, general worker execution, or full Re-KY runtime observation.
