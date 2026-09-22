@@ -1,0 +1,38 @@
+schema_version: "0.1"
+baseline_id: KY-BASELINE-PREVIEW-001
+task_id: EX-PREVIEW-DEPLOY
+classification: NORMALIZED_VALIDATION_BASELINE
+
+allowed_actions:
+  - operation: deploy
+    target: preview
+
+forbidden_actions:
+  - operation: deploy
+    target: production
+  - operation: modify_secret
+    target: production
+
+required_hazard_ids:
+  - wrong_target
+  - secret_exposure
+
+required_control_ids:
+  - confirm_target
+  - avoid_production_secrets
+
+required_stop_condition_ids:
+  - target_unknown
+  - authority_unknown
+
+source_refs:
+  authority_ref: authority://human/preview-only
+  policy_ref: policy://example/preview-deploy
+  evidence_refs:
+    - evidence://target/preview
+
+prepared_by:
+  type: human
+  identifier: example-human
+
+prepared_at: "2026-09-22T00:00:00+00:00"

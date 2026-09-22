@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:boundary-observation:0.2",
+  "title": "NazeYatta Boundary Observation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "observation_id",
+    "classification",
+    "task_id",
+    "handoff_fingerprint",
+    "target_binding",
+    "authority_binding",
+    "policy_binding",
+    "evidence_bindings",
+    "observed_by",
+    "observed_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.2"},
+    "observation_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "classification": {"const": "BOUNDARY_OBSERVATION"},
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "handoff_fingerprint": {"type": "string", "minLength": 1, "maxLength": 256},
+    "target_binding": {
+      "type": "object",
+      "required": ["kind", "identifier", "identity_fingerprint"],
+      "properties": {
+        "kind": {"$ref": "#/$defs/token"},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+        "identity_fingerprint": {"type": "string", "minLength": 1, "maxLength": 256}
+      },
+      "additionalProperties": false
+    },
+    "authority_binding": {"$ref": "#/$defs/sourceBinding"},
+    "policy_binding": {"$ref": "#/$defs/sourceBinding"},
+    "evidence_bindings": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "required": ["ref", "observation_state", "state", "binding_token"],
+        "properties": {
+          "ref": {"type": "string", "minLength": 1, "maxLength": 256},
+          "observation_state": {
+            "enum": ["OBSERVED", "CARRIED_FORWARD", "UNKNOWN"]
+          },
+          "state": {
+            "enum": ["VERIFIED", "PRESENT", "STALE", "INVALID", "MISSING", "UNKNOWN"]
+          },
+          "binding_token": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "observed_by": {
+      "type": "object",
+      "required": ["type", "identifier"],
+      "properties": {
+        "type": {"enum": ["human", "adapter", "workflow"]},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 128}
+      },
+      "additionalProperties": false
+    },
+    "observed_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "token": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._:/-]{0,127}$"
+    },
+    "sourceBinding": {
+      "type": "object",
+      "required": ["ref", "observation_state", "binding_token"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1, "maxLength": 256},
+        "observation_state": {
+          "enum": ["OBSERVED", "CARRIED_FORWARD", "UNKNOWN"]
+        },
+        "binding_token": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

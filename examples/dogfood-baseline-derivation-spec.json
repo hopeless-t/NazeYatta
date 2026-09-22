@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1",
+  "spec_id": "dogfood-fixture-baseline-transform",
+  "classification": "DOGFOOD_BASELINE_DERIVATION_SPEC",
+  "version": "0.1",
+  "source_classifications": {
+    "authority": "DOGFOOD_AUTHORITY_FIXTURE",
+    "policy": "DOGFOOD_POLICY_FIXTURE",
+    "evidence": "DOGFOOD_EVIDENCE_FIXTURE"
+  },
+  "mapping": {
+    "allowed_actions_from": "authority.allowed_action",
+    "forbidden_operations_from": "policy.forbidden_operations",
+    "forbidden_target_from": "policy.target",
+    "required_hazard_ids": [],
+    "required_control_ids": [],
+    "required_stop_condition_ids": []
+  },
+  "semantic_correctness_claimed": false,
+  "authority_granted": false
+}

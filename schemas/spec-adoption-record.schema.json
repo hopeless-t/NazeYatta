@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:spec-adoption-record:0.1",
+  "title": "NazeYatta Spec Adoption Record",
+  "description": "Scoped adoption/attribution record for one exact derivation spec. This does not authenticate the claimed authority.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "adoption_id",
+    "classification",
+    "spec_id",
+    "spec_version",
+    "spec_fingerprint",
+    "authority_ref",
+    "scope",
+    "status",
+    "valid_from",
+    "expires_at",
+    "recorded_by",
+    "recorded_at",
+    "authority_authenticated",
+    "normative_correctness_verified",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "adoption_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "classification": {"const": "SPEC_ADOPTION_RECORD"},
+    "spec_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "spec_version": {"type": "string", "minLength": 1, "maxLength": 128},
+    "spec_fingerprint": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "scope": {
+      "type": "object",
+      "required": [
+        "task_id",
+        "authority_source_ref",
+        "policy_source_ref",
+        "evidence_source_refs"
+      ],
+      "properties": {
+        "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "authority_source_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+        "policy_source_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+        "evidence_source_refs": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {"enum": ["ACTIVE", "REVOKED"]},
+    "valid_from": {"type": "string", "format": "date-time"},
+    "expires_at": {
+      "oneOf": [
+        {"type": "string", "format": "date-time"},
+        {"type": "null"}
+      ]
+    },
+    "recorded_by": {
+      "type": "object",
+      "required": ["type", "identifier"],
+      "properties": {
+        "type": {"enum": ["human", "workflow", "adapter"]},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 128}
+      },
+      "additionalProperties": false
+    },
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "authority_authenticated": {"const": false},
+    "normative_correctness_verified": {"const": false},
+    "authority_granted": {"const": false}
+  },
+  "additionalProperties": false
+}

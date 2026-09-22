@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:spec-adoption-result:0.1",
+  "title": "NazeYatta Spec Adoption Record Evaluation Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "adoption_id",
+    "spec_id",
+    "spec_version",
+    "spec_fingerprint",
+    "record_fingerprint",
+    "scope_fingerprint",
+    "evaluated_at",
+    "outcome",
+    "findings",
+    "authority_authenticated",
+    "normative_correctness_verified",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "adoption_id": {"type": "string"},
+    "spec_id": {"type": "string"},
+    "spec_version": {"type": "string"},
+    "spec_fingerprint": {"type": "string"},
+    "record_fingerprint": {"type": "string"},
+    "scope_fingerprint": {"type": "string"},
+    "evaluated_at": {"type": "string"},
+    "outcome": {"enum": ["RECORD_BOUND", "RECORD_NOT_ADMISSIBLE"]},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "detail"],
+        "properties": {
+          "code": {"type": "string"},
+          "detail": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "authority_authenticated": {"const": false},
+    "normative_correctness_verified": {"const": false},
+    "authority_granted": {"const": false}
+  },
+  "additionalProperties": false
+}

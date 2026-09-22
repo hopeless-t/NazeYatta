@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "classification": "DOGFOOD_AUTHORITY_FIXTURE",
+  "authority_id": "ci-safe-read-only",
+  "allowed_action": {
+    "operation": "read",
+    "target": "runtime-dogfood.txt"
+  },
+  "status": "ACTIVE"
+}

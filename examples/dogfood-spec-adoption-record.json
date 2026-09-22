@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1",
+  "adoption_id": "DOGFOOD-SPEC-ADOPTION-001",
+  "classification": "SPEC_ADOPTION_RECORD",
+  "spec_id": "dogfood-fixture-baseline-transform",
+  "spec_version": "0.1",
+  "spec_fingerprint": "sha256:bdceeb42ad5924f25794c2451af5a378e49503d2df4c6ff688fb74c67de361ba",
+  "authority_ref": "authority://dogfood/spec-adoption-owner",
+  "scope": {
+    "task_id": "DOGFOOD-BASELINE-DERIVATION-001",
+    "authority_source_ref": "authority://dogfood/ci-safe-read-only",
+    "policy_source_ref": "policy://dogfood/runtime-safe-read-v0-1",
+    "evidence_source_refs": [
+      "evidence://dogfood/fixture-exists"
+    ]
+  },
+  "status": "ACTIVE",
+  "valid_from": "2026-09-22T17:15:00+00:00",
+  "expires_at": null,
+  "recorded_by": {
+    "type": "workflow",
+    "identifier": "dogfood-spec-adoption-fixture"
+  },
+  "recorded_at": "2026-09-22T17:15:00+00:00",
+  "authority_authenticated": false,
+  "normative_correctness_verified": false,
+  "authority_granted": false
+}

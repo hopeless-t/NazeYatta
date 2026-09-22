@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:baseline-derivation-result:0.1",
+  "title": "NazeYatta Baseline Derivation Validation Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task_id",
+    "baseline_id",
+    "derivation_id",
+    "baseline_fingerprint",
+    "record_fingerprint",
+    "outcome",
+    "findings",
+    "semantic_correctness_verified",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "task_id": {"type": "string"},
+    "baseline_id": {"type": "string"},
+    "derivation_id": {"type": "string"},
+    "baseline_fingerprint": {"type": "string"},
+    "record_fingerprint": {"type": "string"},
+    "outcome": {"enum": ["PROVENANCE_BOUND", "SOURCE_CHANGED"]},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "detail"],
+        "properties": {
+          "code": {"type": "string"},
+          "detail": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "semantic_correctness_verified": {"const": false},
+    "authority_granted": {"const": false}
+  },
+  "additionalProperties": false
+}
