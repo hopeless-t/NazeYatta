@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:dogfood-baseline-derivation-spec:0.1",
+  "title": "NazeYatta Dogfood Baseline Derivation Spec",
+  "description": "Fixed, non-general dogfood mapping declaration. This is not a general transform DSL.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "spec_id",
+    "classification",
+    "version",
+    "source_classifications",
+    "mapping",
+    "semantic_correctness_claimed",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "spec_id": {"const": "dogfood-fixture-baseline-transform"},
+    "classification": {"const": "DOGFOOD_BASELINE_DERIVATION_SPEC"},
+    "version": {"const": "0.1"},
+    "source_classifications": {
+      "type": "object",
+      "required": ["authority", "policy", "evidence"],
+      "properties": {
+        "authority": {"const": "DOGFOOD_AUTHORITY_FIXTURE"},
+        "policy": {"const": "DOGFOOD_POLICY_FIXTURE"},
+        "evidence": {"const": "DOGFOOD_EVIDENCE_FIXTURE"}
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "type": "object",
+      "required": [
+        "allowed_actions_from",
+        "forbidden_operations_from",
+        "forbidden_target_from",
+        "required_hazard_ids",
+        "required_control_ids",
+        "required_stop_condition_ids"
+      ],
+      "properties": {
+        "allowed_actions_from": {"const": "authority.allowed_action"},
+        "forbidden_operations_from": {"const": "policy.forbidden_operations"},
+        "forbidden_target_from": {"const": "policy.target"},
+        "required_hazard_ids": {"const": []},
+        "required_control_ids": {"const": []},
+        "required_stop_condition_ids": {"const": []}
+      },
+      "additionalProperties": false
+    },
+    "semantic_correctness_claimed": {"const": false},
+    "authority_granted": {"const": false}
+  },
+  "additionalProperties": false
+}
