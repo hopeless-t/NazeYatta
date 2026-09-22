@@ -1,45 +1,41 @@
-# Runtime Dogfood: Fresh Safe-Read v0.2
+# Runtime Dogfood: Fresh Safe-Read v0.3
 
 Status:
 
 ```text
-TYPE = PARTIAL RUNTIME DOGFOOD + FAIL-CLOSED RE-KY EXERCISE
+TYPE = BOUNDED FIXTURE RUNTIME DOGFOOD
 GENERAL EXECUTOR = NOT IMPLEMENTED
 SANDBOX = NOT CLAIMED
-SOURCE-SPECIFIC OBSERVATION ADAPTERS = NOT IMPLEMENTED
-POSITIVE RUNTIME CONTINUE = NOT CLAIMED
+DOGFOOD FIXTURE SOURCE OBSERVATION = IMPLEMENTED
+PRODUCTION SOURCE OBSERVATION = NOT IMPLEMENTED
+GENERAL RUNTIME CONTINUE = NOT CLAIMED
 ```
 
-## Runtime path
+## Purpose
+
+Exercise the current multi-bounce path end to end with deliberately harmless local fixtures:
 
 ```text
-WorkerKYDeclaration
--> ValidationBaseline
--> KY Gate PASS
+Worker KY
+-> deterministic validation
 -> FreshHandoff
--> fresh Python subprocess
--> bounded read-only adapter
--> RuntimeExecutionReceipt
--> BoundaryObservation v0.2
+-> fresh safe-read subprocess
+-> runtime receipt
+-> source observations before/after
 -> Re-KY Gate
--> RE_KY
+-> CONTINUE
 ```
 
-The final `RE_KY` is intentional.
-
-The target path is actually observed by the read adapter, but authority/policy/evidence source bindings have no runtime adapters yet.
-
-They are therefore represented as:
+The positive `CONTINUE` is intentionally limited to fixed dogfood fixtures.
 
 ```text
-observation_state = CARRIED_FORWARD
-binding_token     = null
-evidence state    = UNKNOWN
+Fixture CONTINUE != Production CONTINUE
+CONTINUE != Execution Authority
 ```
 
-The Re-KY Gate correctly refuses `CONTINUE`.
+## Fresh Worker execution
 
-## What the Fresh Worker receives
+The execution Worker receives only:
 
 - serialized FreshHandoff;
 - explicitly supplied allowed filesystem root.
@@ -51,74 +47,130 @@ It does not receive:
 - previous Worker reasoning;
 - conversation history.
 
-## Adapter boundary
-
-The Worker accepts only `operation = read`.
-
-The logical target must resolve beneath the allowed root. Parent traversal and symlink escape are rejected.
+The runtime adapter supports only:
 
 ```text
-Allowed Root Check != OS Sandbox
-Fresh Process != Sandbox
+operation = read
 ```
 
-No shell, write, delete, or network adapter exists.
+Parent traversal and symlink escape outside the allowed root are rejected.
+
+```text
+Fresh Process != Sandbox
+Allowed Root Check != OS Sandbox
+```
+
+No shell, write, delete, or network adapter is implemented.
+
+## Dogfood source observation
+
+The runtime baseline refers to:
+
+```text
+authority://dogfood/ci-safe-read-only
+policy://dogfood/runtime-safe-read-v0-1
+evidence://dogfood/fixture-exists
+```
+
+An explicit dogfood manifest maps only those refs to fixed local fixture files.
+
+The fixture observer:
+
+- accepts only manifest-listed refs;
+- resolves paths beneath one fixed source root;
+- reads the actual fixture bytes;
+- computes SHA-256 over those bytes as the binding token;
+- reads the evidence state from the evidence fixture;
+- performs no write and no network operation.
+
+```text
+Manifest Entry != Source Authority
+Observed Fixture Digest != Source Authenticated
+```
+
+This observer is a dogfood fixture adapter, not a generic URI/source framework.
+
+## Before / after behavior
+
+The fixture sources are observed once before the Fresh Worker runs and again after it finishes.
+
+If their binding tokens and evidence state are unchanged, the Re-KY Gate may return:
+
+```text
+CONTINUE
+```
+
+A regression test changes a copied policy fixture between observations and requires:
+
+```text
+RE_KY
+POLICY_BINDING_CHANGED
+```
+
+Thus positive and negative paths use the same observation mechanism.
 
 ## Runtime receipt
 
-The receipt includes:
+The execution receipt contains:
 
 - task ID;
 - handoff fingerprint;
 - operation / target;
 - SHA-256 content digest;
 - byte count;
-- before/after target identity fingerprints;
+- target identity fingerprints before/after read;
 - Worker PID;
 - outcome;
 - `authority_granted = false`.
 
 File contents are not included.
 
-## Observation truth boundary
+## Claim boundary
+
+A successful current dogfood may establish:
 
 ```text
-target_identity               = OBSERVED
-authority source              = CARRIED_FORWARD
-policy source                 = CARRIED_FORWARD
-evidence source               = CARRIED_FORWARD
-source_bindings_observed      = false
-reky_runtime_evaluated        = true
-reky_runtime_outcome          = RE_KY
-full CONTINUE claimed         = false
+fresh subprocess observed
+bounded fixture read observed
+target identity unchanged
+configured local source fixture bytes observed before/after
+Re-KY Gate evaluated
+fixture-only CONTINUE observed
 ```
 
-This is stronger than the v0.1 dogfood because the Re-KY path is now actually exercised without inventing source fingerprints.
+It does not establish:
 
 ```text
-Runtime RE_KY PASS != Full Observation E2E
-Ref Hash != Source Fingerprint
-Carried Forward != Observed
+production source trust
+authority authenticity
+policy-authority legitimacy
+evidence-source qualification
+general executor safety
+OS sandboxing
+production CONTINUE
+```
+
+The output therefore keeps:
+
+```text
+fixture_reky_runtime_continuation_observed = true
+full_reky_runtime_continuation_claimed = false
+authority_granted = false
 ```
 
 ## CI
 
-The dedicated GitHub Actions dogfood job runs the orchestration on Python 3.11 after the normal 3.11 / 3.12 test matrix.
+The dedicated `Runtime dogfood safe-read` GitHub Actions job runs after the normal Python 3.11 / 3.12 matrix.
 
-Negative runtime tests still cover:
+The ordinary test suite also covers:
 
 - write rejection;
 - parent traversal rejection;
 - symlink escape rejection;
-- unexpected handoff field rejection;
-- no file-content leakage into receipt/log output.
-
-## Next honest milestone
-
-A future positive `CONTINUE` requires real source adapters (or another explicitly authorized source-observation mechanism) that can produce current binding tokens for authority, policy, and evidence sources.
-
-Until then:
-
-```text
-Unobserved Critical Source -> RE_KY
-```
+- unexpected handoff-field rejection;
+- no fixture-content leakage;
+- unknown source-ref rejection;
+- source-manifest traversal rejection;
+- source-fixture symlink escape rejection;
+- invalid evidence-state rejection;
+- changed policy fixture -> RE_KY.
