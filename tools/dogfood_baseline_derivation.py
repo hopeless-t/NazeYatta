@@ -9,11 +9,13 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "tests" / "fixtures" / "source-observation"
 SPEC_PATH = ROOT / "examples" / "dogfood-baseline-derivation-spec.json"
+ADOPTION_RECORD_PATH = ROOT / "examples" / "dogfood-spec-adoption-record.json"
 
 sys.path.insert(0, str(ROOT / "src"))
 
 from nazeyatta.baseline_derivation import validate_baseline_derivation
 from nazeyatta.evaluator import stable_hash
+from nazeyatta.spec_adoption import evaluate_spec_adoption
 
 
 AUTHORITY_REF = "authority://dogfood/ci-safe-read-only"
@@ -84,8 +86,36 @@ def _load_spec() -> tuple[dict, str]:
     return spec, "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
+def _load_adoption_record() -> dict:
+    record = json.loads(ADOPTION_RECORD_PATH.read_text(encoding="utf-8"))
+    if not isinstance(record, dict):
+        raise RuntimeError("spec adoption record must be a JSON object")
+    return record
+
+
 def main() -> int:
-    spec, spec_fingerprint = _load_spec()
+    spec, spec_file_sha256 = _load_spec()
+    adoption_record = _load_adoption_record()
+    now = datetime.now(timezone.utc).isoformat()
+
+    expected_scope = {
+        "task_id": "DOGFOOD-BASELINE-DERIVATION-001",
+        "authority_source_ref": AUTHORITY_REF,
+        "policy_source_ref": POLICY_REF,
+        "evidence_source_refs": [EVIDENCE_REF],
+    }
+    adoption = evaluate_spec_adoption(
+        spec,
+        adoption_record,
+        expected_scope=expected_scope,
+        evaluated_at=now,
+    )
+    if adoption.outcome != "RECORD_BOUND":
+        raise RuntimeError(
+            f"dogfood spec adoption record is not admissible: "
+            f"{adoption.outcome} {adoption.findings!r}"
+        )
+
     authority, authority_token = _read_json_fixture("authority.json")
     policy, policy_token = _read_json_fixture("policy.json")
     evidence, evidence_token = _read_json_fixture("evidence.json")
@@ -134,7 +164,6 @@ def main() -> int:
     if evidence.get("target") != target:
         raise RuntimeError("evidence and policy fixture targets disagree")
 
-    now = datetime.now(timezone.utc).isoformat()
     baseline = {
         "schema_version": "0.1",
         "baseline_id": "KY-BASELINE-DERIVATION-DOGFOOD-001",
@@ -228,7 +257,12 @@ def main() -> int:
         "record_fingerprint": result.record_fingerprint,
         "source_snapshots_observed": True,
         "derivation_method": f"{spec['spec_id']}@{spec['version']}",
-        "derivation_spec_fingerprint": spec_fingerprint,
+        "derivation_spec_fingerprint": stable_hash(spec),
+        "derivation_spec_file_sha256": spec_file_sha256,
+        "spec_adoption_outcome": adoption.outcome,
+        "spec_adoption_record_fingerprint": adoption.record_fingerprint,
+        "spec_authority_authenticated": adoption.authority_authenticated,
+        "spec_normative_correctness_verified": adoption.normative_correctness_verified,
         "transform_conforms_to_declared_spec": True,
         "derived_required_hazard_ids": [],
         "derived_required_control_ids": [],
