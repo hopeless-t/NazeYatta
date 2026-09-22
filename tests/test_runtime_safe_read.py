@@ -80,14 +80,12 @@ def test_runtime_dogfood_orchestrator_runs_fresh_process():
     assert summary["target"] == "runtime-dogfood.txt"
     assert summary["target_identity_unchanged"] is True
     assert summary["authority_granted"] is False
-    assert summary["source_bindings_observed"] is False
+    assert summary["source_bindings_observed"] is True
+    assert summary["source_observer_scope"] == "dogfood_local_fixtures_only"
     assert summary["reky_runtime_evaluated"] is True
-    assert summary["reky_runtime_outcome"] == "RE_KY"
-    assert {
-        "AUTHORITY_NOT_OBSERVED",
-        "POLICY_NOT_OBSERVED",
-        "EVIDENCE_NOT_OBSERVED",
-    } <= set(summary["reky_reason_codes"])
+    assert summary["reky_runtime_outcome"] == "CONTINUE"
+    assert summary["reky_reason_codes"] == []
+    assert summary["fixture_reky_runtime_continuation_observed"] is True
     assert summary["full_reky_runtime_continuation_claimed"] is False
     assert "This file is intentionally boring" not in proc.stdout
 
