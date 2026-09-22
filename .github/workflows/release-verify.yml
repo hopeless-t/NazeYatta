@@ -16,18 +16,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 2
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Assert exact candidate
+      - name: Assert exact candidate plus verification-only instrumentation
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "310aed9b588298ac17844ded516c8b86baed1f7d" || {
-            echo "candidate drift: $(git rev-parse HEAD)"
+          BASE="310aed9b588298ac17844ded516c8b86baed1f7d"
+          test "$(git rev-parse HEAD^)" = "$BASE" || {
+            echo "candidate parent drift: parent=$(git rev-parse HEAD^)"
+            exit 1
+          }
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          test "$CHANGED" = ".github/workflows/release-verify.yml" || {
+            echo "unexpected candidate delta:"
+            printf '%s\n' "$CHANGED"
             exit 1
           }
 
@@ -49,7 +56,8 @@ jobs:
           mkdir -p release-evidence
           {
             echo "repository=hopeless-t/NazeYatta"
-            echo "candidate_commit=$(git rev-parse HEAD)"
+            echo "candidate_source_commit=310aed9b588298ac17844ded516c8b86baed1f7d"
+            echo "verification_commit=$(git rev-parse HEAD)"
             echo "candidate_version=0.1.0a2"
             echo "builder_python=$(python --version 2>&1)"
             echo
@@ -82,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 2
 
       - uses: actions/setup-python@v5
         with:
@@ -156,7 +164,8 @@ jobs:
           PY
 
           {
-            echo "candidate_commit=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+            echo "candidate_source_commit=310aed9b588298ac17844ded516c8b86baed1f7d"
+            echo "verification_commit=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
             echo "python=$(python --version 2>&1)"
             echo "package_version=$(python -c 'from importlib.metadata import version; print(version("nazeyatta"))')"
             echo "block_exit=$BLOCK_EXIT"
