@@ -84,13 +84,14 @@ def compile_fresh_handoff(
     baseline_allowed = _action_set(baseline["allowed_actions"])
     baseline_forbidden = _action_set(baseline["forbidden_actions"])
 
-    admitted = sorted(worker_allowed & baseline_allowed)
+    # v0.1 handoff is deliberately single-action and single-bounce.
+    # The gate may have validated a wider understood scope, but the next Worker
+    # receives only the immediate intended action.
+    intended = _action_tuple(declaration["intended_action"])
+    if intended not in worker_allowed or intended not in baseline_allowed:
+        raise FreshHandoffError("PASS produced no admitted intended action for handoff")
+    admitted = [intended]
     forbidden = sorted(worker_forbidden | baseline_forbidden)
-
-    if not admitted:
-        # A PASS should make this impossible, but keep the compiler fail-closed
-        # if gate semantics are changed later.
-        raise FreshHandoffError("PASS produced no admitted action for handoff")
 
     source_refs = baseline["source_refs"]
     copied_source_refs = {
