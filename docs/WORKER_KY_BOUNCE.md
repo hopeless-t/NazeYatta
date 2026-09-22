@@ -52,7 +52,13 @@ Observation Gate
         +---- changed ------> Re-KY before continuing
 ```
 
-Only the first artifact — `WorkerKYDeclaration` — is implemented by this tranche.
+The original contract tranche implements `WorkerKYDeclaration`.
+
+The stacked validation tranche refines it for deterministic comparison and adds a separate ValidationBaseline / KY Gate. See `docs/KY_VALIDATION_GATE.md`.
+
+```text
+Contract Refinement != Runtime Enforcement
+```
 
 ## Why not capture reasoning?
 
@@ -100,7 +106,19 @@ declared_by
 declared_at
 ```
 
-The bounded statement arrays are intentionally small. They are not a place for a Worker to dump chain-of-thought.
+The declaration stays bounded, but the validation tranche refines the machine-comparable fields:
+
+- allowed/forbidden scope uses exact `operation + target` action atoms;
+- hazards, controls and stop conditions use stable IDs plus human-readable summaries.
+
+Empty hazard/control/stop lists are valid self-report. They do not mean "safe"; a ValidationBaseline may still require items and return REVIEW.
+
+```text
+Empty Self-Report != Safe
+Machine-Readable Atom != Evidence
+```
+
+These fields are not a place for a Worker to dump chain-of-thought.
 
 ## Evidence and authority boundary
 
