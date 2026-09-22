@@ -15,28 +15,31 @@ def load_contract():
 
 def test_worker_ky_schema_is_closed_and_self_report_only():
     schema, _ = load_contract()
-    assert schema["$id"] == "urn:nazeyatta:schema:worker-ky:0.1"
+    assert schema["$id"] == "urn:nazeyatta:schema:worker-ky:0.2"
     assert schema["additionalProperties"] is False
     assert schema["properties"]["classification"]["const"] == "WORKER_SELF_REPORT"
     assert schema["properties"]["declared_by"]["properties"]["type"]["const"] == "worker"
 
 
-def test_worker_ky_bounded_statement_fields_are_bounded_lists():
-    schema, _ = load_contract()
-    for field in (
-        "understood_allowed_scope",
-        "understood_forbidden_scope",
-        "recognized_hazards",
-        "planned_controls",
-        "stop_conditions",
-    ):
-        ref = schema["properties"][field]["$ref"]
-        assert ref == "#/$defs/boundedStatements"
-    bounded = schema["$defs"]["boundedStatements"]
-    assert bounded["minItems"] == 1
-    assert bounded["maxItems"] == 32
-    assert bounded["uniqueItems"] is True
-    assert bounded["items"]["maxLength"] == 256
+def test_worker_ky_scope_is_machine_readable_action_atoms():
+    schema, example = load_contract()
+    assert schema["properties"]["intended_action"]["$ref"] == "#/$defs/actionAtom"
+    for field in ("understood_allowed_scope", "understood_forbidden_scope"):
+        assert schema["properties"][field]["$ref"] == "#/$defs/actionAtoms"
+        values = example[field]
+        assert 1 <= len(values) <= 32
+        assert all(set(v) == {"operation", "target"} for v in values)
+
+
+def test_worker_ky_items_have_ids_and_human_summaries():
+    schema, example = load_contract()
+    for field in ("recognized_hazards", "planned_controls", "stop_conditions"):
+        assert schema["properties"][field]["$ref"] == "#/$defs/kyItems"
+        values = example[field]
+        assert 1 <= len(values) <= 32
+        assert all(set(v) == {"id", "summary"} for v in values)
+        ids = [v["id"] for v in values]
+        assert len(ids) == len(set(ids))
 
 
 def test_worker_ky_example_matches_required_contract_shape():
@@ -44,19 +47,7 @@ def test_worker_ky_example_matches_required_contract_shape():
     assert set(schema["required"]) <= set(example)
     assert example["classification"] == "WORKER_SELF_REPORT"
     assert example["declared_by"]["type"] == "worker"
-    assert example["schema_version"] == "0.1"
-
-    for field in (
-        "understood_allowed_scope",
-        "understood_forbidden_scope",
-        "recognized_hazards",
-        "planned_controls",
-        "stop_conditions",
-    ):
-        values = example[field]
-        assert 1 <= len(values) <= 32
-        assert len(values) == len(set(values))
-        assert all(isinstance(v, str) and 1 <= len(v) <= 256 for v in values)
+    assert example["schema_version"] == "0.2"
 
 
 def test_worker_ky_example_contains_no_verified_evidence_claim():
