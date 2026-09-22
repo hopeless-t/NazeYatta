@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:nazeyatta:schema:boundary-observation:0.1",
+  "$id": "urn:nazeyatta:schema:boundary-observation:0.2",
   "title": "NazeYatta Boundary Observation",
   "type": "object",
   "required": [
@@ -17,70 +17,39 @@
     "observed_at"
   ],
   "properties": {
-    "schema_version": {
-      "const": "0.1"
-    },
-    "observation_id": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128
-    },
-    "classification": {
-      "const": "BOUNDARY_OBSERVATION"
-    },
-    "task_id": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128
-    },
-    "handoff_fingerprint": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
-    },
+    "schema_version": {"const": "0.2"},
+    "observation_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "classification": {"const": "BOUNDARY_OBSERVATION"},
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "handoff_fingerprint": {"type": "string", "minLength": 1, "maxLength": 256},
     "target_binding": {
       "type": "object",
       "required": ["kind", "identifier", "identity_fingerprint"],
       "properties": {
-        "kind": {
-          "$ref": "#/$defs/token"
-        },
-        "identifier": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        },
-        "identity_fingerprint": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
-        }
+        "kind": {"$ref": "#/$defs/token"},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+        "identity_fingerprint": {"type": "string", "minLength": 1, "maxLength": 256}
       },
       "additionalProperties": false
     },
-    "authority_binding": {
-      "$ref": "#/$defs/sourceBinding"
-    },
-    "policy_binding": {
-      "$ref": "#/$defs/sourceBinding"
-    },
+    "authority_binding": {"$ref": "#/$defs/sourceBinding"},
+    "policy_binding": {"$ref": "#/$defs/sourceBinding"},
     "evidence_bindings": {
       "type": "array",
       "maxItems": 32,
       "items": {
         "type": "object",
-        "required": ["ref", "state", "fingerprint"],
+        "required": ["ref", "observation_state", "state", "binding_token"],
         "properties": {
-          "ref": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256
+          "ref": {"type": "string", "minLength": 1, "maxLength": 256},
+          "observation_state": {
+            "enum": ["OBSERVED", "CARRIED_FORWARD", "UNKNOWN"]
           },
           "state": {
             "enum": ["VERIFIED", "PRESENT", "STALE", "INVALID", "MISSING", "UNKNOWN"]
           },
-          "fingerprint": {
-            "type": "string",
+          "binding_token": {
+            "type": ["string", "null"],
             "minLength": 1,
             "maxLength": 256
           }
@@ -92,21 +61,12 @@
       "type": "object",
       "required": ["type", "identifier"],
       "properties": {
-        "type": {
-          "enum": ["human", "adapter", "workflow"]
-        },
-        "identifier": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        }
+        "type": {"enum": ["human", "adapter", "workflow"]},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 128}
       },
       "additionalProperties": false
     },
-    "observed_at": {
-      "type": "string",
-      "format": "date-time"
-    }
+    "observed_at": {"type": "string", "format": "date-time"}
   },
   "$defs": {
     "token": {
@@ -115,15 +75,14 @@
     },
     "sourceBinding": {
       "type": "object",
-      "required": ["ref", "fingerprint"],
+      "required": ["ref", "observation_state", "binding_token"],
       "properties": {
-        "ref": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+        "ref": {"type": "string", "minLength": 1, "maxLength": 256},
+        "observation_state": {
+          "enum": ["OBSERVED", "CARRIED_FORWARD", "UNKNOWN"]
         },
-        "fingerprint": {
-          "type": "string",
+        "binding_token": {
+          "type": ["string", "null"],
           "minLength": 1,
           "maxLength": 256
         }
