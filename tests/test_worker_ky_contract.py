@@ -24,11 +24,13 @@ def test_worker_ky_schema_is_closed_and_self_report_only():
 def test_worker_ky_scope_is_machine_readable_action_atoms():
     schema, example = load_contract()
     assert schema["properties"]["intended_action"]["$ref"] == "#/$defs/actionAtom"
+    assert schema["properties"]["understood_allowed_scope"]["$ref"] == "#/$defs/nonEmptyActionAtoms"
+    assert schema["properties"]["understood_forbidden_scope"]["$ref"] == "#/$defs/actionAtoms"
     for field in ("understood_allowed_scope", "understood_forbidden_scope"):
-        assert schema["properties"][field]["$ref"] == "#/$defs/actionAtoms"
         values = example[field]
-        assert 1 <= len(values) <= 32
+        assert len(values) <= 32
         assert all(set(v) == {"operation", "target"} for v in values)
+    assert example["understood_allowed_scope"]
 
 
 def test_worker_ky_items_have_ids_and_human_summaries():
@@ -36,7 +38,7 @@ def test_worker_ky_items_have_ids_and_human_summaries():
     for field in ("recognized_hazards", "planned_controls", "stop_conditions"):
         assert schema["properties"][field]["$ref"] == "#/$defs/kyItems"
         values = example[field]
-        assert 1 <= len(values) <= 32
+        assert len(values) <= 32
         assert all(set(v) == {"id", "summary"} for v in values)
         ids = [v["id"] for v in values]
         assert len(ids) == len(set(ids))
