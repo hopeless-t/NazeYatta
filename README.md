@@ -283,7 +283,7 @@ Read them when you need the deeper model:
 
 NazeYatta is an **alpha research tool**.
 
-Implemented now:
+Implemented preflight foundation:
 
 - deterministic YAML preflight evaluation;
 - bundled generic baseline rules;
@@ -295,16 +295,31 @@ Implemented now:
 - structured violation-debrief templates;
 - tests and examples.
 
-Not automatic end-to-end functionality:
+Bounded experimental contracts now also exist for:
 
-- task generation;
-- runtime observation adapters;
+- typed Worker KY declarations and a deterministic KY validation gate;
+- a single-bounce Fresh Handoff and Boundary Observation / Re-KY comparison;
+- fresh-process, read-only dogfood with local fixture source observation;
+- BaselineDerivationRecord;
+- a bounded dogfood DerivationSpec;
+- a scoped SpecAdoptionRecord.
+
+Those contracts and dogfoods demonstrate bounded mechanics. They do **not** turn NazeYatta into a production executor, authority system, IAM/PKI layer, or proof that a rule/spec is normatively correct.
+
+Not automatic production end-to-end functionality:
+
+- AI-generated Worker KY declarations;
+- production source/runtime adapters and continuous observation;
 - live execution enforcement;
-- automatic provenance authentication;
+- authority authentication for evidence, policy, or derivation-spec adoption;
+- normative/semantic correctness proof;
 - automatic remediation;
 - authority generation.
 
 ~~~text
+Fixture Dogfood != Production Runtime
+RECORD_BOUND != Authority Authenticated
+PROVENANCE_BOUND != Semantic Correctness Verified
 Unknown != Safe
 Worker Self-Declaration != Evidence
 Evidence != Authority
