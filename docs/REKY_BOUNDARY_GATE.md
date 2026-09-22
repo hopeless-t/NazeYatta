@@ -1,10 +1,10 @@
-# Boundary Observation / Re-KY Gate v0.1
+# Boundary Observation / Re-KY Gate v0.2
 
 Status:
 
 ```text
-TYPE = BOUNDARY-ONLY CHANGE DETECTOR
-RUNTIME ADAPTER = NOT IMPLEMENTED
+TYPE = BOUNDARY-ONLY CHANGE / OBSERVATION-QUALITY DETECTOR
+SOURCE-SPECIFIC RUNTIME ADAPTERS = NOT IMPLEMENTED
 WORKER SPAWN = NOT IMPLEMENTED
 AUTOMATIC RE-KY GENERATION = NOT IMPLEMENTED
 AUTHORITY GRANT = NEVER
@@ -14,130 +14,130 @@ AUTHORITY GRANT = NEVER
 
 A Fresh Worker is allowed only one bounded execution bounce by the current handoff contract.
 
-Before deciding whether another bounce may reuse the previous KY work, compare the execution boundary.
+Before deciding whether another bounce may reuse the previous KY work, compare the execution boundary **and whether critical source bindings were actually observed**.
 
 ```text
-Before BoundaryObservation
-        +
-After BoundaryObservation
+FreshHandoff
++ Before BoundaryObservation
++ After BoundaryObservation
         |
         v
 CONTINUE / RE_KY
 ```
 
-## What counts as a boundary?
+## Observation states
 
-This v0.1 experiment watches:
-
-- target identity binding;
-- authority reference/fingerprint;
-- policy reference/fingerprint;
-- evidence reference set;
-- evidence state/fingerprint;
-- observation source identity.
-
-It deliberately does not hash the entire mutable target content.
+Source bindings use one of three explicit states:
 
 ```text
-Target Content Changed
-!=
-Execution Boundary Changed
+OBSERVED
+CARRIED_FORWARD
+UNKNOWN
 ```
 
-A successful intended write may change content without requiring a new KY by itself.
-
-## CONTINUE
-
-CONTINUE means:
+- `OBSERVED`: the observation source supplied a current binding token;
+- `CARRIED_FORWARD`: the reference was copied from prior state/handoff without re-observing the source;
+- `UNKNOWN`: the current source binding is unavailable.
 
 ```text
-the observed boundary bindings did not change
-between the supplied before/after snapshots
+CARRIED_FORWARD != OBSERVED
+UNKNOWN != OBSERVED
+Reference Present != Source Observed
 ```
 
-It does not authorize execution.
+For generic sources the change value is called a `binding_token`, not a fingerprint. A future source adapter may use a digest, revision, etag, version, or another stable token.
 
 ```text
+Binding Token != Source Authenticated
+Observed Token != Authority Proven
+```
+
+## Fail-closed CONTINUE rule
+
+`CONTINUE` requires all critical authority, policy, and evidence bindings to be `OBSERVED` in both snapshots and unchanged.
+
+If a critical source is `CARRIED_FORWARD` or `UNKNOWN`, the result is `RE_KY`.
+
+```text
+Unobserved Critical Source -> RE_KY
 CONTINUE != Execution Authority
 Boundary Unchanged != World Unchanged
 ```
 
-## RE_KY
+## Evidence binding rule
 
-RE_KY is returned when a relevant boundary changes, including:
+An evidence binding contains:
 
-- target identity changes;
-- authority binding changes;
-- policy binding changes;
-- observation source changes;
-- evidence is added/removed;
-- evidence fingerprint changes;
-- evidence state changes;
-- evidence becomes STALE / INVALID / MISSING / UNKNOWN.
+- source ref;
+- observation state;
+- evidence state;
+- binding token.
 
-RE_KY only says the old KY/handoff should not be reused without another preflight cycle.
-
-It does not generate a Worker automatically.
-
-## Observation source boundary
-
-An observation records who/what produced it, but this tranche does not authenticate or qualify that observer.
+When evidence is not `OBSERVED`:
 
 ```text
-Observed By X != X Qualified
-Observation Present != Observation Trusted
+binding_token = null
+state = UNKNOWN
 ```
 
-Observer changes trigger RE_KY conservatively.
+This prevents copied or unavailable evidence from being represented as VERIFIED.
 
-## Evidence states
+Observed evidence may still trigger `RE_KY` if:
 
-A transition to one of these states requires Re-KY:
+- its binding token changes;
+- its evidence state changes;
+- it becomes STALE / INVALID / MISSING / UNKNOWN.
+
+## Target boundary
+
+Target identity remains directly represented by:
 
 ```text
-STALE
-INVALID
-MISSING
-UNKNOWN
+kind
+identifier
+identity_fingerprint
 ```
 
-The comparator does not invent a stronger state.
+The comparator deliberately does not hash the entire mutable target content.
 
-## Chronology and binding
+```text
+Target Content Changed != Execution Boundary Changed
+```
 
-The comparator receives the actual FreshHandoff object.
+## Cross-stage binding
 
-It recomputes the handoff fingerprint and requires the **before** observation to bind to:
+The comparator receives the actual FreshHandoff object and recomputes its fingerprint.
 
-- the handoff task ID;
-- the actual handoff fingerprint;
-- the intended target;
-- the handoff authority reference;
-- the handoff policy reference;
-- the handoff evidence-reference set.
+The before observation must bind to:
 
-Only after that cross-stage binding is established does it compare before/after observations.
+- handoff task ID;
+- actual handoff fingerprint;
+- intended target;
+- authority ref;
+- policy ref;
+- evidence-ref set.
+
+Only then are before/after snapshots compared.
 
 ```text
 Two Matching Fake Observations != Valid Continuation
 Before Snapshot != Handoff -> Reject
 ```
 
-Before/after observations must also:
+## Runtime status
 
-- use the same task ID;
-- bind to the same Fresh Handoff fingerprint;
-- be chronologically ordered.
-
-Otherwise they are rejected as incomparable inputs rather than treated as a normal RE_KY event.
-
-## Next stage
-
-A runtime adapter may later produce BoundaryObservation records from real systems.
-
-That adapter is not part of this tranche.
+The safe-read dogfood now exercises this gate truthfully:
 
 ```text
-Observation Contract Exists != Runtime Observation Exists
-Re-KY Decision Exists != Re-KY Worker Spawned
+target identity = observed
+authority       = carried forward
+policy          = carried forward
+evidence        = carried forward / unknown
+        |
+        v
+RE_KY
 ```
+
+That is a successful fail-closed runtime result, not a positive continuation result.
+
+Source-specific adapters are still future work.
