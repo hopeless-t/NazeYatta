@@ -9,6 +9,21 @@ from .evaluator import stable_hash
 
 EVIDENCE_STATES = {"VERIFIED", "PRESENT", "STALE", "INVALID", "MISSING", "UNKNOWN"}
 
+BASELINE_KEYS = {
+    "schema_version",
+    "baseline_id",
+    "task_id",
+    "classification",
+    "allowed_actions",
+    "forbidden_actions",
+    "required_hazard_ids",
+    "required_control_ids",
+    "required_stop_condition_ids",
+    "source_refs",
+    "prepared_by",
+    "prepared_at",
+}
+
 RECORD_KEYS = {
     "schema_version",
     "derivation_id",
@@ -192,8 +207,17 @@ def _validate_record(record: dict[str, Any]) -> None:
         raise BaselineDerivationError("record.authority_granted must be false")
 
 
-def _baseline_source_refs(baseline: dict[str, Any]) -> tuple[str, str, set[str]]:
+def _baseline_source_refs(
+    baseline: dict[str, Any],
+) -> tuple[str, str, str, str, set[str]]:
     baseline = _mapping(baseline, "baseline")
+    _exact_keys(baseline, BASELINE_KEYS, "baseline")
+    if baseline.get("schema_version") != "0.1":
+        raise BaselineDerivationError("baseline.schema_version must be '0.1'")
+    if baseline.get("classification") != "NORMALIZED_VALIDATION_BASELINE":
+        raise BaselineDerivationError(
+            "baseline.classification must be NORMALIZED_VALIDATION_BASELINE"
+        )
     task_id = _string(baseline.get("task_id"), "baseline.task_id", max_len=128)
     baseline_id = _string(baseline.get("baseline_id"), "baseline.baseline_id", max_len=128)
     refs = _mapping(baseline.get("source_refs"), "baseline.source_refs")
