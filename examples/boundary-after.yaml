@@ -1,0 +1,29 @@
+schema_version: "0.1"
+observation_id: OBS-AFTER-001
+classification: BOUNDARY_OBSERVATION
+task_id: EX-PREVIEW-DEPLOY
+handoff_fingerprint: sha256:example-handoff
+
+target_binding:
+  kind: environment
+  identifier: preview
+  identity_fingerprint: sha256:preview-identity
+
+authority_binding:
+  ref: authority://human/preview-only
+  fingerprint: sha256:authority-v1
+
+policy_binding:
+  ref: policy://example/preview-deploy
+  fingerprint: sha256:policy-v1
+
+evidence_bindings:
+  - ref: evidence://target/preview
+    state: VERIFIED
+    fingerprint: sha256:target-evidence-v1
+
+observed_by:
+  type: adapter
+  identifier: example-boundary-adapter
+
+observed_at: "2026-09-22T00:01:00+00:00"
