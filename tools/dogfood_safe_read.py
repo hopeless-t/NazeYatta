@@ -11,6 +11,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = ROOT / "tests" / "fixtures"
+SOURCE_ROOT = FIXTURE_ROOT / "source-observation"
+SOURCE_MANIFEST = SOURCE_ROOT / "manifest.json"
 
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -18,23 +20,17 @@ from nazeyatta.evaluator import load_yaml, stable_hash
 from nazeyatta.fresh_handoff import compile_fresh_handoff
 from nazeyatta.ky_gate import evaluate_ky_gate
 from nazeyatta.reky_gate import evaluate_reky_gate
+from nazeyatta.runtime_fixture_sources import observe_fixture_sources
 
 
-def _carried_source(ref: str) -> dict:
-    return {
-        "ref": ref,
-        "observation_state": "CARRIED_FORWARD",
-        "binding_token": None,
-    }
-
-
-def _carried_evidence(ref: str) -> dict:
-    return {
-        "ref": ref,
-        "observation_state": "CARRIED_FORWARD",
-        "state": "UNKNOWN",
-        "binding_token": None,
-    }
+def _observe_sources(handoff) -> dict:
+    return observe_fixture_sources(
+        manifest_path=SOURCE_MANIFEST,
+        source_root=SOURCE_ROOT,
+        authority_ref=handoff.source_refs["authority_ref"],
+        policy_ref=handoff.source_refs["policy_ref"],
+        evidence_refs=list(handoff.source_refs["evidence_refs"]),
+    )
 
 
 def main() -> int:
@@ -54,7 +50,9 @@ def main() -> int:
     handoff_payload = asdict(handoff)
     handoff_fingerprint = stable_hash(handoff_payload)
 
+    before_sources = _observe_sources(handoff)
     before_time = datetime.now(timezone.utc)
+
     with tempfile.TemporaryDirectory(prefix="nazeyatta-dogfood-") as td:
         handoff_path = Path(td) / "handoff.json"
         handoff_path.write_text(
@@ -84,6 +82,8 @@ def main() -> int:
             errors="replace",
             timeout=15,
         )
+
+    after_sources = _observe_sources(handoff)
     after_time = datetime.now(timezone.utc)
 
     if proc.returncode != 0:
@@ -113,11 +113,6 @@ def main() -> int:
         "classification": "BOUNDARY_OBSERVATION",
         "task_id": handoff.task_id,
         "handoff_fingerprint": handoff_fingerprint,
-        "authority_binding": _carried_source(handoff.source_refs["authority_ref"]),
-        "policy_binding": _carried_source(handoff.source_refs["policy_ref"]),
-        "evidence_bindings": [
-            _carried_evidence(ref) for ref in handoff.source_refs["evidence_refs"]
-        ],
         "observed_by": {
             "type": "workflow",
             "identifier": "dogfood-safe-read-orchestrator",
@@ -133,6 +128,7 @@ def main() -> int:
                 "before_target_identity_fingerprint"
             ],
         },
+        **before_sources,
         "observed_at": before_time.isoformat(),
     }
     after = {
@@ -145,23 +141,19 @@ def main() -> int:
                 "after_target_identity_fingerprint"
             ],
         },
+        **after_sources,
         "observed_at": after_time.isoformat(),
     }
 
     reky = evaluate_reky_gate(handoff, before, after)
-    if reky.outcome != "RE_KY":
+    if reky.outcome != "CONTINUE":
         raise RuntimeError(
-            "runtime dogfood must fail closed to RE_KY while source bindings are unobserved"
+            f"fixture-source dogfood expected CONTINUE, got {reky.outcome}: {reky.reasons!r}"
         )
     reason_codes = sorted({reason["code"] for reason in reky.reasons})
-    required_codes = {
-        "AUTHORITY_NOT_OBSERVED",
-        "POLICY_NOT_OBSERVED",
-        "EVIDENCE_NOT_OBSERVED",
-    }
-    if not required_codes.issubset(reason_codes):
+    if reason_codes:
         raise RuntimeError(
-            f"runtime Re-KY reasons missing source-observation codes: {reason_codes!r}"
+            f"fixture-source CONTINUE unexpectedly had Re-KY reasons: {reason_codes!r}"
         )
 
     summary = {
@@ -178,10 +170,12 @@ def main() -> int:
         "target_identity_unchanged": receipt["target_identity_unchanged"],
         "handoff_fingerprint": receipt["handoff_fingerprint"],
         "authority_granted": False,
-        "source_bindings_observed": False,
+        "source_bindings_observed": True,
+        "source_observer_scope": "dogfood_local_fixtures_only",
         "reky_runtime_evaluated": True,
         "reky_runtime_outcome": reky.outcome,
         "reky_reason_codes": reason_codes,
+        "fixture_reky_runtime_continuation_observed": True,
         "full_reky_runtime_continuation_claimed": False,
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
