@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:ky-gate-result:0.1",
+  "title": "NazeYatta KY Gate Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task_id",
+    "declaration_id",
+    "baseline_id",
+    "declaration_fingerprint",
+    "baseline_fingerprint",
+    "outcome",
+    "findings",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "declaration_id": {
+      "type": "string"
+    },
+    "baseline_id": {
+      "type": "string"
+    },
+    "declaration_fingerprint": {
+      "type": "string"
+    },
+    "baseline_fingerprint": {
+      "type": "string"
+    },
+    "outcome": {
+      "enum": ["PASS", "REVIEW", "BLOCK"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "effect", "detail"],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "effect": {
+            "enum": ["REVIEW", "BLOCK"]
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "authority_granted": {
+      "const": false
+    }
+  },
+  "additionalProperties": false
+}
