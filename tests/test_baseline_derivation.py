@@ -196,3 +196,35 @@ def test_result_is_deterministic(tmp_path):
     b = validate_baseline_derivation(baseline, record, current_source_snapshots=snapshots)
 
     assert asdict(a) == asdict(b)
+
+
+def test_non_baseline_object_is_rejected_even_if_ids_and_refs_exist(tmp_path):
+    source_root = tmp_path / "sources"
+    shutil.copytree(SOURCE_TEMPLATE, source_root)
+    baseline = load_yaml(BASELINE_PATH)
+    snapshots = observe(source_root, baseline)
+    record = record_for(baseline, snapshots)
+
+    invalid = {
+        "schema_version": "0.1",
+        "baseline_id": baseline["baseline_id"],
+        "task_id": baseline["task_id"],
+        "classification": "NOT_A_BASELINE",
+        "source_refs": deepcopy(baseline["source_refs"]),
+    }
+
+    with pytest.raises(BaselineDerivationError):
+        validate_baseline_derivation(invalid, record)
+
+
+def test_extra_baseline_field_is_rejected(tmp_path):
+    source_root = tmp_path / "sources"
+    shutil.copytree(SOURCE_TEMPLATE, source_root)
+    baseline = load_yaml(BASELINE_PATH)
+    snapshots = observe(source_root, baseline)
+    record = record_for(baseline, snapshots)
+
+    baseline["unexpected_derivation_magic"] = True
+
+    with pytest.raises(BaselineDerivationError, match="unsupported keys"):
+        validate_baseline_derivation(baseline, record)
