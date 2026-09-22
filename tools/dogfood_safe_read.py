@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,24 @@ sys.path.insert(0, str(ROOT / "src"))
 from nazeyatta.evaluator import load_yaml, stable_hash
 from nazeyatta.fresh_handoff import compile_fresh_handoff
 from nazeyatta.ky_gate import evaluate_ky_gate
+from nazeyatta.reky_gate import evaluate_reky_gate
+
+
+def _carried_source(ref: str) -> dict:
+    return {
+        "ref": ref,
+        "observation_state": "CARRIED_FORWARD",
+        "binding_token": None,
+    }
+
+
+def _carried_evidence(ref: str) -> dict:
+    return {
+        "ref": ref,
+        "observation_state": "CARRIED_FORWARD",
+        "state": "UNKNOWN",
+        "binding_token": None,
+    }
 
 
 def main() -> int:
@@ -35,6 +54,7 @@ def main() -> int:
     handoff_payload = asdict(handoff)
     handoff_fingerprint = stable_hash(handoff_payload)
 
+    before_time = datetime.now(timezone.utc)
     with tempfile.TemporaryDirectory(prefix="nazeyatta-dogfood-") as td:
         handoff_path = Path(td) / "handoff.json"
         handoff_path.write_text(
@@ -64,6 +84,7 @@ def main() -> int:
             errors="replace",
             timeout=15,
         )
+    after_time = datetime.now(timezone.utc)
 
     if proc.returncode != 0:
         raise RuntimeError(
@@ -87,6 +108,62 @@ def main() -> int:
     if not receipt["target_identity_unchanged"]:
         raise RuntimeError("target identity changed during safe-read dogfood")
 
+    common = {
+        "schema_version": "0.2",
+        "classification": "BOUNDARY_OBSERVATION",
+        "task_id": handoff.task_id,
+        "handoff_fingerprint": handoff_fingerprint,
+        "authority_binding": _carried_source(handoff.source_refs["authority_ref"]),
+        "policy_binding": _carried_source(handoff.source_refs["policy_ref"]),
+        "evidence_bindings": [
+            _carried_evidence(ref) for ref in handoff.source_refs["evidence_refs"]
+        ],
+        "observed_by": {
+            "type": "workflow",
+            "identifier": "dogfood-safe-read-orchestrator",
+        },
+    }
+    before = {
+        **common,
+        "observation_id": "DOGFOOD-BOUNDARY-BEFORE",
+        "target_binding": {
+            "kind": "file",
+            "identifier": receipt["target"],
+            "identity_fingerprint": receipt[
+                "before_target_identity_fingerprint"
+            ],
+        },
+        "observed_at": before_time.isoformat(),
+    }
+    after = {
+        **common,
+        "observation_id": "DOGFOOD-BOUNDARY-AFTER",
+        "target_binding": {
+            "kind": "file",
+            "identifier": receipt["target"],
+            "identity_fingerprint": receipt[
+                "after_target_identity_fingerprint"
+            ],
+        },
+        "observed_at": after_time.isoformat(),
+    }
+
+    reky = evaluate_reky_gate(handoff, before, after)
+    if reky.outcome != "RE_KY":
+        raise RuntimeError(
+            "runtime dogfood must fail closed to RE_KY while source bindings are unobserved"
+        )
+    reason_codes = sorted({reason["code"] for reason in reky.reasons})
+    required_codes = {
+        "AUTHORITY_NOT_OBSERVED",
+        "POLICY_NOT_OBSERVED",
+        "EVIDENCE_NOT_OBSERVED",
+    }
+    if not required_codes.issubset(reason_codes):
+        raise RuntimeError(
+            f"runtime Re-KY reasons missing source-observation codes: {reason_codes!r}"
+        )
+
     summary = {
         "dogfood": "PASS",
         "classification": "PARTIAL_RUNTIME_DOGFOOD",
@@ -102,6 +179,9 @@ def main() -> int:
         "handoff_fingerprint": receipt["handoff_fingerprint"],
         "authority_granted": False,
         "source_bindings_observed": False,
+        "reky_runtime_evaluated": True,
+        "reky_runtime_outcome": reky.outcome,
+        "reky_reason_codes": reason_codes,
         "full_reky_runtime_continuation_claimed": False,
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
