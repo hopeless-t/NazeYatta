@@ -1,9 +1,44 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime
+import re
 from typing import Any
 
 from .evaluator import stable_hash
+
+
+TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._:/-]{0,127}$")
+
+DECLARATION_KEYS = {
+    "schema_version",
+    "declaration_id",
+    "task_id",
+    "classification",
+    "intended_action",
+    "understood_allowed_scope",
+    "understood_forbidden_scope",
+    "recognized_hazards",
+    "planned_controls",
+    "stop_conditions",
+    "declared_by",
+    "declared_at",
+}
+
+BASELINE_KEYS = {
+    "schema_version",
+    "baseline_id",
+    "task_id",
+    "classification",
+    "allowed_actions",
+    "forbidden_actions",
+    "required_hazard_ids",
+    "required_control_ids",
+    "required_stop_condition_ids",
+    "source_refs",
+    "prepared_by",
+    "prepared_at",
+}
 
 
 class KYGateError(ValueError):
@@ -36,16 +71,46 @@ def _require_mapping(value: Any, where: str) -> dict[str, Any]:
     return value
 
 
+def _require_exact_keys(value: dict[str, Any], expected: set[str], where: str) -> None:
+    actual = set(value)
+    missing = expected - actual
+    extra = actual - expected
+    if missing:
+        raise KYGateError(f"{where} is missing required keys: {sorted(missing)!r}")
+    if extra:
+        raise KYGateError(f"{where} has unsupported keys: {sorted(extra)!r}")
+
+
 def _require_string(value: Any, where: str) -> str:
     if not isinstance(value, str) or not value:
         raise KYGateError(f"{where} must be a non-empty string")
     return value
 
 
+def _require_token(value: Any, where: str) -> str:
+    token = _require_string(value, where)
+    if not TOKEN_RE.fullmatch(token):
+        raise KYGateError(f"{where} must be a normalized lowercase token")
+    return token
+
+
+def _require_timestamp(value: Any, where: str) -> str:
+    raw = _require_string(value, where)
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise KYGateError(f"{where} must be an ISO-8601 date-time") from exc
+    if parsed.tzinfo is None:
+        raise KYGateError(f"{where} must include a timezone")
+    return raw
+
+
 def _action(value: Any, where: str) -> tuple[str, str]:
     item = _require_mapping(value, where)
-    operation = _require_string(item.get("operation"), f"{where}.operation")
-    target = _require_string(item.get("target"), f"{where}.target")
+    _require_exact_keys(item, {"operation", "target"}, where)
+    operation = _require_token(item.get("operation"), f"{where}.operation")
+    target = _require_token(item.get("target"), f"{where}.target")
     return operation, target
 
 
@@ -71,9 +136,13 @@ def _ky_ids(value: Any, where: str) -> set[str]:
         raise KYGateError(f"{where} must contain at most 32 items")
     ids: list[str] = []
     for i, raw in enumerate(value):
-        item = _require_mapping(raw, f"{where}[{i}]")
-        ids.append(_require_string(item.get("id"), f"{where}[{i}].id"))
-        _require_string(item.get("summary"), f"{where}[{i}].summary")
+        item_where = f"{where}[{i}]"
+        item = _require_mapping(raw, item_where)
+        _require_exact_keys(item, {"id", "summary"}, item_where)
+        ids.append(_require_token(item.get("id"), f"{item_where}.id"))
+        summary = _require_string(item.get("summary"), f"{item_where}.summary")
+        if len(summary) > 256:
+            raise KYGateError(f"{item_where}.summary must be at most 256 characters")
     if len(ids) != len(set(ids)):
         raise KYGateError(f"{where} contains duplicate ids")
     return set(ids)
@@ -84,10 +153,64 @@ def _required_ids(value: Any, where: str) -> set[str]:
         raise KYGateError(f"{where} must be a list")
     if len(value) > 32:
         raise KYGateError(f"{where} must contain at most 32 ids")
-    ids = [_require_string(v, f"{where}[{i}]") for i, v in enumerate(value)]
+    ids = [_require_token(v, f"{where}[{i}]") for i, v in enumerate(value)]
     if len(ids) != len(set(ids)):
         raise KYGateError(f"{where} contains duplicate ids")
     return set(ids)
+
+
+def _validate_declaration_metadata(declaration: dict[str, Any]) -> None:
+    _require_exact_keys(declaration, DECLARATION_KEYS, "declaration")
+    if declaration.get("schema_version") != "0.2":
+        raise KYGateError("declaration.schema_version must be '0.2'")
+    if declaration.get("classification") != "WORKER_SELF_REPORT":
+        raise KYGateError("declaration.classification must be WORKER_SELF_REPORT")
+
+    declared_by = _require_mapping(declaration.get("declared_by"), "declaration.declared_by")
+    _require_exact_keys(declared_by, {"type", "identifier"}, "declaration.declared_by")
+    if declared_by.get("type") != "worker":
+        raise KYGateError("declaration.declared_by.type must be 'worker'")
+    _require_string(declared_by.get("identifier"), "declaration.declared_by.identifier")
+    _require_timestamp(declaration.get("declared_at"), "declaration.declared_at")
+
+
+def _validate_baseline_metadata(baseline: dict[str, Any]) -> None:
+    _require_exact_keys(baseline, BASELINE_KEYS, "baseline")
+    if baseline.get("schema_version") != "0.1":
+        raise KYGateError("baseline.schema_version must be '0.1'")
+    if baseline.get("classification") != "NORMALIZED_VALIDATION_BASELINE":
+        raise KYGateError(
+            "baseline.classification must be NORMALIZED_VALIDATION_BASELINE"
+        )
+
+    source_refs = _require_mapping(baseline.get("source_refs"), "baseline.source_refs")
+    _require_exact_keys(
+        source_refs,
+        {"authority_ref", "policy_ref", "evidence_refs"},
+        "baseline.source_refs",
+    )
+    _require_string(source_refs.get("authority_ref"), "baseline.source_refs.authority_ref")
+    _require_string(source_refs.get("policy_ref"), "baseline.source_refs.policy_ref")
+    evidence_refs = source_refs.get("evidence_refs")
+    if not isinstance(evidence_refs, list):
+        raise KYGateError("baseline.source_refs.evidence_refs must be a list")
+    if len(evidence_refs) > 32:
+        raise KYGateError("baseline.source_refs.evidence_refs must contain at most 32 refs")
+    refs = [
+        _require_string(v, f"baseline.source_refs.evidence_refs[{i}]")
+        for i, v in enumerate(evidence_refs)
+    ]
+    if len(refs) != len(set(refs)):
+        raise KYGateError("baseline.source_refs.evidence_refs contains duplicates")
+
+    prepared_by = _require_mapping(baseline.get("prepared_by"), "baseline.prepared_by")
+    _require_exact_keys(prepared_by, {"type", "identifier"}, "baseline.prepared_by")
+    if prepared_by.get("type") not in {"human", "adapter", "workflow"}:
+        raise KYGateError(
+            "baseline.prepared_by.type must be human, adapter, or workflow"
+        )
+    _require_string(prepared_by.get("identifier"), "baseline.prepared_by.identifier")
+    _require_timestamp(baseline.get("prepared_at"), "baseline.prepared_at")
 
 
 def _format_action(action: tuple[str, str]) -> str:
@@ -109,12 +232,8 @@ def evaluate_ky_gate(
     declaration = _require_mapping(declaration, "declaration")
     baseline = _require_mapping(baseline, "baseline")
 
-    if declaration.get("classification") != "WORKER_SELF_REPORT":
-        raise KYGateError("declaration.classification must be WORKER_SELF_REPORT")
-    if baseline.get("classification") != "NORMALIZED_VALIDATION_BASELINE":
-        raise KYGateError(
-            "baseline.classification must be NORMALIZED_VALIDATION_BASELINE"
-        )
+    _validate_declaration_metadata(declaration)
+    _validate_baseline_metadata(baseline)
 
     task_id = _require_string(declaration.get("task_id"), "declaration.task_id")
     baseline_task_id = _require_string(baseline.get("task_id"), "baseline.task_id")
