@@ -133,7 +133,7 @@ PASS At T0 != Eternal PASS
 
 This tranche does not yet create or execute a Fresh Worker.
 
-A future handoff compiler can accept only a PASS result and produce a bounded capsule containing validated scope and references.
+The next stacked tranche implements a handoff compiler that accepts only a PASS result and produces a bounded single-bounce capsule containing admitted scope and references. See `docs/FRESH_WORKER_HANDOFF.md`.
 
 ```text
 PASS Result
