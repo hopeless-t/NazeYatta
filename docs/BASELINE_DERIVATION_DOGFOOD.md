@@ -123,7 +123,19 @@ required_control_ids = []
 required_stop_condition_ids = []
 ```
 
-The dogfood tool rejects any unsupported mapping and records the exact spec-file SHA-256 in its runtime summary.
+The dogfood tool rejects any unsupported mapping and reports both the canonical parsed-spec fingerprint and the raw spec-file SHA-256.
+
+Before running the transform, the dogfood also evaluates the bounded SpecAdoptionRecord for the exact dogfood scope.
+
+Expected adoption result:
+
+```text
+RECORD_BOUND
+spec_authority_authenticated = false
+spec_normative_correctness_verified = false
+```
+
+`RECORD_BOUND` is only a scoped lifecycle/spec binding. It is not authority authentication.
 
 ```text
 Transform Matches Declared Spec
@@ -132,3 +144,50 @@ Declared Spec Is Normatively Correct
 ```
 
 This is not a general transformation DSL.
+
+
+## Spec identity fields
+
+The runtime summary distinguishes:
+
+```text
+derivation_spec_fingerprint
+= canonical parsed object fingerprint
+
+derivation_spec_file_sha256
+= raw artifact bytes digest
+```
+
+The canonical value is used by SpecAdoptionRecord. The raw digest remains useful for exact artifact-byte identity.
+
+## Adoption gate in the dogfood
+
+The bounded flow is now:
+
+```text
+DerivationSpec
++ SpecAdoptionRecord
++ explicit scope / evaluation time
+        |
+        v
+RECORD_BOUND
+        |
+        v
+bounded transform
+        |
+        v
+BaselineDerivationRecord
+        |
+        v
+PROVENANCE_BOUND
+```
+
+A revoked or otherwise non-admissible adoption record stops the dogfood before the transform.
+
+Still:
+
+```text
+RECORD_BOUND != Authority Authenticated
+RECORD_BOUND != Spec Normatively Correct
+PROVENANCE_BOUND != Semantic Correctness Verified
+```
