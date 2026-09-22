@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:worker-ky:0.1",
+  "title": "NazeYatta Worker KY Declaration",
+  "description": "Bounded pre-work self-report from an acting Worker. It is not Evidence, Authority, or chain-of-thought.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "declaration_id",
+    "task_id",
+    "classification",
+    "intended_action",
+    "understood_allowed_scope",
+    "understood_forbidden_scope",
+    "recognized_hazards",
+    "planned_controls",
+    "stop_conditions",
+    "declared_by",
+    "declared_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "declaration_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "classification": {
+      "const": "WORKER_SELF_REPORT"
+    },
+    "intended_action": {
+      "type": "object",
+      "required": ["operation", "target"],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "additionalProperties": false
+    },
+    "understood_allowed_scope": {
+      "$ref": "#/$defs/boundedStatements"
+    },
+    "understood_forbidden_scope": {
+      "$ref": "#/$defs/boundedStatements"
+    },
+    "recognized_hazards": {
+      "$ref": "#/$defs/boundedStatements"
+    },
+    "planned_controls": {
+      "$ref": "#/$defs/boundedStatements"
+    },
+    "stop_conditions": {
+      "$ref": "#/$defs/boundedStatements"
+    },
+    "declared_by": {
+      "type": "object",
+      "required": ["type", "identifier"],
+      "properties": {
+        "type": {
+          "const": "worker"
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
+    },
+    "declared_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "boundedStatements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    }
+  },
+  "additionalProperties": false
+}
