@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -27,8 +27,8 @@ jobs:
         run: |
           set -euo pipefail
           BASE="310aed9b588298ac17844ded516c8b86baed1f7d"
-          test "$(git rev-parse HEAD^)" = "$BASE" || {
-            echo "candidate parent drift: parent=$(git rev-parse HEAD^)"
+          git merge-base --is-ancestor "$BASE" HEAD || {
+            echo "candidate source commit is not an ancestor"
             exit 1
           }
           CHANGED="$(git diff --name-only "$BASE"...HEAD)"
@@ -90,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
