@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:reky-decision:0.1",
+  "title": "NazeYatta Re-KY Decision",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task_id",
+    "handoff_fingerprint",
+    "before_observation_id",
+    "after_observation_id",
+    "before_fingerprint",
+    "after_fingerprint",
+    "outcome",
+    "reasons",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "handoff_fingerprint": {
+      "type": "string"
+    },
+    "before_observation_id": {
+      "type": "string"
+    },
+    "after_observation_id": {
+      "type": "string"
+    },
+    "before_fingerprint": {
+      "type": "string"
+    },
+    "after_fingerprint": {
+      "type": "string"
+    },
+    "outcome": {
+      "enum": ["CONTINUE", "RE_KY"]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "detail"],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "authority_granted": {
+      "const": false
+    }
+  },
+  "additionalProperties": false
+}
