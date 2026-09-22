@@ -12,6 +12,7 @@ from .fresh_handoff import FreshHandoff
 TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9._:/-]{0,127}$")
 EVIDENCE_STATES = {"VERIFIED", "PRESENT", "STALE", "INVALID", "MISSING", "UNKNOWN"}
 DEGRADED_EVIDENCE_STATES = {"STALE", "INVALID", "MISSING", "UNKNOWN"}
+OBSERVATION_STATES = {"OBSERVED", "CARRIED_FORWARD", "UNKNOWN"}
 
 OBSERVATION_KEYS = {
     "schema_version",
@@ -95,13 +96,34 @@ def _timestamp(value: Any, where: str) -> datetime:
     return parsed
 
 
-def _source_binding(value: Any, where: str) -> tuple[str, str]:
+def _observation_state(value: Any, where: str) -> str:
+    state = _string(value, where, max_len=32)
+    if state not in OBSERVATION_STATES:
+        raise ObservationGateError(f"{where} is not an allowed observation state")
+    return state
+
+
+def _binding_token(value: Any, observation_state: str, where: str) -> str | None:
+    if observation_state == "OBSERVED":
+        return _string(value, where)
+    if value is not None:
+        raise ObservationGateError(
+            f"{where} must be null when observation_state is {observation_state}"
+        )
+    return None
+
+
+def _source_binding(value: Any, where: str) -> tuple[str, str, str | None]:
     item = _mapping(value, where)
-    _exact_keys(item, {"ref", "fingerprint"}, where)
-    return (
-        _string(item.get("ref"), f"{where}.ref"),
-        _string(item.get("fingerprint"), f"{where}.fingerprint"),
+    _exact_keys(item, {"ref", "observation_state", "binding_token"}, where)
+    ref = _string(item.get("ref"), f"{where}.ref")
+    observation_state = _observation_state(
+        item.get("observation_state"), f"{where}.observation_state"
     )
+    token = _binding_token(
+        item.get("binding_token"), observation_state, f"{where}.binding_token"
+    )
+    return ref, observation_state, token
 
 
 def _target_binding(value: Any, where: str) -> tuple[str, str, str]:
@@ -127,34 +149,54 @@ def _observer(value: Any, where: str) -> tuple[str, str]:
     )
 
 
-def _evidence_bindings(value: Any, where: str) -> dict[str, tuple[str, str]]:
+def _evidence_bindings(
+    value: Any, where: str
+) -> dict[str, tuple[str, str, str | None]]:
     if not isinstance(value, list):
         raise ObservationGateError(f"{where} must be a list")
     if len(value) > 32:
         raise ObservationGateError(f"{where} must contain at most 32 bindings")
 
-    out: dict[str, tuple[str, str]] = {}
+    out: dict[str, tuple[str, str, str | None]] = {}
     for i, raw in enumerate(value):
         item_where = f"{where}[{i}]"
         item = _mapping(raw, item_where)
-        _exact_keys(item, {"ref", "state", "fingerprint"}, item_where)
+        _exact_keys(
+            item,
+            {"ref", "observation_state", "state", "binding_token"},
+            item_where,
+        )
         ref = _string(item.get("ref"), f"{item_where}.ref")
+        observation_state = _observation_state(
+            item.get("observation_state"),
+            f"{item_where}.observation_state",
+        )
         state = _string(item.get("state"), f"{item_where}.state", max_len=32)
         if state not in EVIDENCE_STATES:
-            raise ObservationGateError(f"{item_where}.state is not an allowed evidence state")
-        fingerprint = _string(
-            item.get("fingerprint"), f"{item_where}.fingerprint"
+            raise ObservationGateError(
+                f"{item_where}.state is not an allowed evidence state"
+            )
+        token = _binding_token(
+            item.get("binding_token"),
+            observation_state,
+            f"{item_where}.binding_token",
         )
+        if observation_state != "OBSERVED" and state != "UNKNOWN":
+            raise ObservationGateError(
+                f"{item_where}.state must be UNKNOWN when source is not OBSERVED"
+            )
         if ref in out:
-            raise ObservationGateError(f"{where} contains duplicate evidence ref {ref!r}")
-        out[ref] = (state, fingerprint)
+            raise ObservationGateError(
+                f"{where} contains duplicate evidence ref {ref!r}"
+            )
+        out[ref] = (observation_state, state, token)
     return out
 
 
 def _validate_observation(value: dict[str, Any], where: str) -> dict[str, Any]:
     _exact_keys(value, OBSERVATION_KEYS, where)
-    if value.get("schema_version") != "0.1":
-        raise ObservationGateError(f"{where}.schema_version must be '0.1'")
+    if value.get("schema_version") != "0.2":
+        raise ObservationGateError(f"{where}.schema_version must be '0.2'")
     if value.get("classification") != "BOUNDARY_OBSERVATION":
         raise ObservationGateError(
             f"{where}.classification must be BOUNDARY_OBSERVATION"
@@ -179,7 +221,9 @@ def evaluate_reky_gate(
     if not isinstance(handoff, FreshHandoff):
         raise ObservationGateError("handoff must be a FreshHandoff")
     if handoff.classification != "KY_VALIDATED_HANDOFF":
-        raise ObservationGateError("handoff.classification must be KY_VALIDATED_HANDOFF")
+        raise ObservationGateError(
+            "handoff.classification must be KY_VALIDATED_HANDOFF"
+        )
     if handoff.authority_granted is not False:
         raise ObservationGateError("handoff must not grant execution authority")
     if handoff.validity != {"mode": "single_bounce", "runtime_state_bound": False}:
@@ -193,55 +237,99 @@ def evaluate_reky_gate(
     before_time = _timestamp(before["observed_at"], "before.observed_at")
     after_time = _timestamp(after["observed_at"], "after.observed_at")
     if after_time < before_time:
-        raise ObservationGateError("after observation must not predate before observation")
+        raise ObservationGateError(
+            "after observation must not predate before observation"
+        )
 
     if before["task_id"] != handoff.task_id:
-        raise ObservationGateError("before observation task_id does not bind to handoff")
+        raise ObservationGateError(
+            "before observation task_id does not bind to handoff"
+        )
     if before["handoff_fingerprint"] != expected_handoff_fingerprint:
-        raise ObservationGateError("before observation handoff_fingerprint does not bind to handoff")
+        raise ObservationGateError(
+            "before observation handoff_fingerprint does not bind to handoff"
+        )
 
-    before_target = _target_binding(before["target_binding"], "before.target_binding")
+    before_target = _target_binding(
+        before["target_binding"], "before.target_binding"
+    )
     if before_target[1] != handoff.intended_action["target"]:
-        raise ObservationGateError("before observation target does not bind to handoff intended target")
+        raise ObservationGateError(
+            "before observation target does not bind to handoff intended target"
+        )
 
-    before_authority = _source_binding(before["authority_binding"], "before.authority_binding")
+    before_authority = _source_binding(
+        before["authority_binding"], "before.authority_binding"
+    )
     if before_authority[0] != handoff.source_refs["authority_ref"]:
-        raise ObservationGateError("before observation authority ref does not bind to handoff")
+        raise ObservationGateError(
+            "before observation authority ref does not bind to handoff"
+        )
 
-    before_policy = _source_binding(before["policy_binding"], "before.policy_binding")
+    before_policy = _source_binding(
+        before["policy_binding"], "before.policy_binding"
+    )
     if before_policy[0] != handoff.source_refs["policy_ref"]:
-        raise ObservationGateError("before observation policy ref does not bind to handoff")
+        raise ObservationGateError(
+            "before observation policy ref does not bind to handoff"
+        )
 
     before_evidence_for_binding = _evidence_bindings(
         before["evidence_bindings"], "before.evidence_bindings"
     )
     if set(before_evidence_for_binding) != set(handoff.source_refs["evidence_refs"]):
-        raise ObservationGateError("before observation evidence refs do not bind to handoff")
+        raise ObservationGateError(
+            "before observation evidence refs do not bind to handoff"
+        )
 
     if before["task_id"] != after["task_id"]:
         raise ObservationGateError("before/after task_id mismatch")
     if before["handoff_fingerprint"] != after["handoff_fingerprint"]:
-        raise ObservationGateError("before/after handoff_fingerprint mismatch")
+        raise ObservationGateError(
+            "before/after handoff_fingerprint mismatch"
+        )
 
     reasons: list[ReKYReason] = []
 
     def add(code: str, detail: str) -> None:
         reasons.append(ReKYReason(code=code, detail=detail))
 
-    if _target_binding(before["target_binding"], "before.target_binding") != _target_binding(
-        after["target_binding"], "after.target_binding"
-    ):
+    if _target_binding(
+        before["target_binding"], "before.target_binding"
+    ) != _target_binding(after["target_binding"], "after.target_binding"):
         add("TARGET_BINDING_CHANGED", "target identity binding changed")
 
-    if _source_binding(before["authority_binding"], "before.authority_binding") != _source_binding(
+    before_authority = _source_binding(
+        before["authority_binding"], "before.authority_binding"
+    )
+    after_authority = _source_binding(
         after["authority_binding"], "after.authority_binding"
-    ):
-        add("AUTHORITY_BINDING_CHANGED", "authority reference or fingerprint changed")
+    )
+    if before_authority[0] != after_authority[0]:
+        add("AUTHORITY_BINDING_CHANGED", "authority reference changed")
+    if before_authority[1] != "OBSERVED" or after_authority[1] != "OBSERVED":
+        add(
+            "AUTHORITY_NOT_OBSERVED",
+            "authority binding was not observed in both boundary snapshots",
+        )
+    elif before_authority[2] != after_authority[2]:
+        add("AUTHORITY_BINDING_CHANGED", "authority binding token changed")
 
-    if _source_binding(before["policy_binding"], "before.policy_binding") != _source_binding(
+    before_policy = _source_binding(
+        before["policy_binding"], "before.policy_binding"
+    )
+    after_policy = _source_binding(
         after["policy_binding"], "after.policy_binding"
-    ):
-        add("POLICY_BINDING_CHANGED", "policy reference or fingerprint changed")
+    )
+    if before_policy[0] != after_policy[0]:
+        add("POLICY_BINDING_CHANGED", "policy reference changed")
+    if before_policy[1] != "OBSERVED" or after_policy[1] != "OBSERVED":
+        add(
+            "POLICY_NOT_OBSERVED",
+            "policy binding was not observed in both boundary snapshots",
+        )
+    elif before_policy[2] != after_policy[2]:
+        add("POLICY_BINDING_CHANGED", "policy binding token changed")
 
     if _observer(before["observed_by"], "before.observed_by") != _observer(
         after["observed_by"], "after.observed_by"
@@ -260,16 +348,26 @@ def evaluate_reky_gate(
     if before_refs != after_refs:
         added = sorted(after_refs - before_refs)
         removed = sorted(before_refs - after_refs)
-        detail = f"evidence binding set changed; added={added!r}, removed={removed!r}"
-        add("EVIDENCE_SET_CHANGED", detail)
+        add(
+            "EVIDENCE_SET_CHANGED",
+            f"evidence binding set changed; added={added!r}, removed={removed!r}",
+        )
 
     for ref in sorted(before_refs & after_refs):
-        before_state, before_fp = before_evidence[ref]
-        after_state, after_fp = after_evidence[ref]
-        if before_fp != after_fp:
+        before_obs, before_state, before_token = before_evidence[ref]
+        after_obs, after_state, after_token = after_evidence[ref]
+
+        if before_obs != "OBSERVED" or after_obs != "OBSERVED":
             add(
-                "EVIDENCE_FINGERPRINT_CHANGED",
-                f"evidence {ref!r} fingerprint changed",
+                "EVIDENCE_NOT_OBSERVED",
+                f"evidence {ref!r} was not observed in both boundary snapshots",
+            )
+            continue
+
+        if before_token != after_token:
+            add(
+                "EVIDENCE_BINDING_TOKEN_CHANGED",
+                f"evidence {ref!r} binding token changed",
             )
         if before_state != after_state:
             add(
