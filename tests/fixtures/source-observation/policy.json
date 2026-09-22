@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.1",
+  "classification": "DOGFOOD_POLICY_FIXTURE",
+  "policy_id": "runtime-safe-read-v0-1",
+  "allowed_operation": "read",
+  "forbidden_operations": [
+    "write",
+    "delete"
+  ],
+  "target": "runtime-dogfood.txt"
+}
