@@ -344,115 +344,251 @@ fingerprintだけで「誰がその内容を作ったか」や「その内容が
 
 ---
 
-## NazeYattaではないもの
+## NazeYattaの役割と限界
 
-NazeYattaは次のものではありません。
+ここまでを短くまとめると、NazeYattaの役割は、
 
-- 作業そのものを実行するAI Worker
-- 実行engine
-- 権限を発行するauthority
-- certification system
-- 完成した万能policy platform
-- 自動remediation system
-- Evidence Sourceが本当に正しい人・機械だったと証明する仕組み
-- end-to-endの自動enforcement
+> **AIや自動化プログラムが作業を始める前に、渡された作業内容・確認情報・ルールを照らし合わせ、作業前チェックの結果を返すこと**
 
-現在のalphaは、**渡されたTask / Evidence構造とPolicy条件をdeterministicに評価する道具**です。
+です。
 
-大きな影響を持つ操作では、Workerが回避できない別のenforcement pointを使ってください。
+一方で、NazeYatta自身は次のことを行いません。
 
----
+- 実際の作業そのものを実行する
+- 「この作業をしてよい」という実行権限を新しく作る
+- ルールを決めた人・組織が、本当にその権限を持っているかまで自動で証明する
+- BLOCKになった作業を、現在のalpha版だけで物理的に停止させる
 
-## なぜ「NazeYatta」なの？
-
-**なぜやった？**
-
-名前の由来は、AI Workerで時々起きるこの現象です。
+つまり、
 
 ~~~text
-Human:
-  「Xはやらないで」
-
-AI:
-  「了解しました。Xはしません」
-
-AI:
-  Xを実行
+NazeYattaの判定
+      !=
+実際の作業を強制的に止める仕組み
 ~~~
 
-そこで、
+です。
 
-> **実行する前に、何が確認済みでなければならなかったのか？**
+重要な操作で本当にBLOCK時の実行を防ぎたい場合は、NazeYattaの判定を受け取る側の仕組みでも、
 
-を機械的に確認しよう、というのがNazeYattaの出発点です。
+> **BLOCKなら次の処理を実行しない**
 
-猫だらけの表示は意図的にふざけています。  
-その下のresult semanticsはふざけていません。
+ように作る必要があります。
 
 ---
 
-## 詳しい設計はどこ？
+## なぜ「NazeYatta（なぜやった？）」なの？
 
-**最初のExampleを動かすだけなら、ここから先の概念を理解する必要はありません。**
+開発のきっかけは、AIに作業を頼んだ時に何度も起きた、こんな失敗でした。
 
-必要になった時だけ読めます。
+~~~text
+人:
+  「今日はこの範囲だけ作業してください」
+  「ここから先は許可していません」
 
-- [Semantics](docs/SEMANTICS.md) — Policy != Evidence、Evidence != Authority、stateと境界
-- [Evidence Model](docs/EVIDENCE_MODEL.md) — Evidence Record、provenance、freshness
-- [Policy Model](docs/POLICY_MODEL.md) — applicabilityとpolicy effect
-- [Threat Model](docs/THREAT_MODEL.md) — 何が壊れ得ると仮定しているか
-- [Roadmap](docs/ROADMAP.md) — 実装済み・研究中・意図的に後回しにしたもの
-- [Violation Debrief](docs/VIOLATION_DEBRIEF.md) — 違反後の振り返り構造
-- [日本語 First Steps](docs/FIRST_STEPS.ja.md) — さらに手順寄りの導入
+AI:
+  「了解しました。許可された範囲だけ作業します」
+
+その後……
+
+AI:
+  許可していない作業まで実行
+~~~
+
+終わった後に、
+
+> **「なぜやった？」**
+
+と聞くことになります。
+
+そこで最初は、工事現場の朝礼やKY（危険予知）のように、**作業を始める前にAI自身にも、これから行う作業を言葉にさせる**ことから始まりました。
+
+たとえば：
+
+~~~text
+本日の作業:
+  Preview環境へ反映します
+
+自分が許可されていると理解している範囲:
+  Preview環境だけを変更します
+  Production環境は変更しません
+
+考えられる危険:
+  反映先を取り違える
+  秘密情報を外へ出してしまう
+
+作業前の確認:
+  反映先を確認してから実行します
+  対象が曖昧なら作業を止めます
+~~~
+
+大事なのは、**AIがこう発言したから安全だ、と信用することではありません。**
+
+AI自身の発言は、
+
+> **「このAIは、今の作業・危険・許可範囲をどう理解していると主張しているか」**
+
+を外から確認するための材料です。
+
+その理解を、別に与えられたルールや許可範囲、確認情報と照らし合わせます。
+
+~~~text
+AI自身の作業前KY
+  「Productionは触りません」
+        +
+実際に与えられた許可範囲
+  「Previewのみ」
+        +
+Projectのルール
+        +
+確認情報
+        |
+        v
+     Validator
+        |
+        v
+   作業前の判定
+~~~
+
+逆に、
+
+~~~text
+AI:
+  「Productionへの反映も許可されています」
+
+実際の許可:
+  「Previewのみ」
+~~~
+
+なら、その食い違いを作業前に見つけて止まる方向へ持っていく、という発想です。
+
+ここで重要なのは：
+
+~~~text
+AI自身の発言
+      !=
+確認済みの証跡（Evidence）
+~~~
+
+ということです。
+
+自己申告だけで「安全」「確認済み」にはしません。
+
+### 現在のalpha版では
+
+この原点にある、
+
+> **AI自身に作業前KYを生成させ、その内容まで自動で検査する一連の流れ**
+
+は、まだend-to-endでは実装されていません。
+
+現在実装されている中心部分は、
+
+> **外から渡された作業内容・確認情報・ルールを、決められた方法で照らし合わせ、作業前の判定とチェック記録を返す部分**
+
+です。
+
+つまり、**原点にあるWorker自身のKYは今後育てる重要な部分で、現在のalpha版はその土台となるValidator側を先に実装している**、という状態です。
+
+猫だらけの表示は意図的にふざけています。  
+でも、確認できていないことを「たぶん大丈夫」にしない、という考え方は真面目です。
+
+---
+
+## もっと詳しく知りたい場合
+
+最初の例を動かすだけなら、以下を全部理解する必要はありません。
+
+必要になった時だけ読めるよう、詳しい設計を別の文書に分けています。
+
+- [Semantics](docs/SEMANTICS.md)  
+  **判定ルール・確認情報・実行権限は別物**、という基本的な考え方
+
+- [Evidence Model](docs/EVIDENCE_MODEL.md)  
+  **何を確認したのか、その情報はどこから来たのか、いつ確認したのか**を扱う考え方
+
+- [Policy Model](docs/POLICY_MODEL.md)  
+  **どの作業に、どのルールを適用し、どんな判定を返すか**の考え方
+
+- [Threat Model](docs/THREAT_MODEL.md)  
+  **どんな失敗や危険が起きる可能性を想定しているか**
+
+- [Roadmap](docs/ROADMAP.md)  
+  **今できること、これから研究・実装したいこと、あえて後回しにしていること**
+
+- [Violation Debrief](docs/VIOLATION_DEBRIEF.md)  
+  **実際にルール違反が起きた後、「なぜやった？」を記録して振り返るための形式**
+
+- [日本語 First Steps](docs/FIRST_STEPS.ja.md)  
+  **日本語でさらに手順を追って試したい場合の導入**
 
 ---
 
 ## 現在の状態
 
-NazeYattaは **alpha research tool** です。
+NazeYattaは、まだ**開発途中の実験的なOSS（alpha版）**です。
 
-現在実装されているもの：
+### 現在できること
 
-- deterministic YAML preflight evaluation
-- generic baseline rules
-- explicit evidence states
-- conservative CLI exit code
-- JSON / human-readable receipt
-- task / policy fingerprint
-- provenance-linked v0.2 input lane
-- violation-debrief template
-- tests / examples
+- YAMLで書かれた作業内容を読み込む
+- 同梱または指定されたルールと照らし合わせる
+- VERIFIED（確認済み）や UNKNOWN（不明・未確認）などの状態を区別する
+- PASS（チェック通過） / REVIEW（要確認） / BLOCK（停止）などの判定を返す
+- 人が読む表示と、プログラムが扱いやすいJSON形式の両方でチェック記録を返す
+- 作業内容やルール一式に識別用のfingerprint（ハッシュ値）を付ける
+- 確認情報の出所を記録できる、実験的なv0.2形式を扱う
+- ルール違反が起きた後の振り返り用テンプレートを出す
+- 自動テストで基本動作を検証する
 
-まだend-to-endで自動化していないもの：
+### まだ自動化できていないこと
 
-- Taskそのものの自動生成
-- runtime observation adapter
-- live execution enforcement
-- provenance sourceの自動認証
-- automatic remediation
-- authority generation
+- AI自身に「今日の作業・危険・許可範囲」を作業前KYとして自動生成させ、その内容まで一連で検査する
+- 実際に作業中のAIやツールを観測し続ける
+- BLOCK判定になった操作を、NazeYatta単体で強制停止する
+- 確認情報を出した人・システムが、本当にその情報を保証する権限を持つか自動認証する
+- ルールを決めた人・組織が、本当にそのルールを決める権限を持つか自動認証する
+- 問題を見つけた後、自動で修復作業まで行う
 
-最後に、この4本だけ覚えれば十分です。
+最後に、この4本はNazeYattaの重要な境界です。
 
 ~~~text
-Unknown != Safe
-Worker Self-Declaration != Evidence
-Evidence != Authority
-PASS != Execution Authority
+Unknown（不明・未確認）
+  !=
+Safe（安全）
+
+AI自身の自己申告
+  !=
+確認済みの証跡（Evidence）
+
+確認情報・証跡（Evidence）
+  !=
+実行権限
+
+PASS（チェック通過）
+  !=
+実行権限の付与
 ~~~
 
-## Contributing
+---
 
-[CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+## 開発に参加する
 
-もし「何が分からないのかすら分からない」状態になったら、それ自体が重要なdocumentation bugの証拠です。
+修正案や改善提案については [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
-そのままIssueへ：
+もしREADMEを読んで、
+
+> **「何が分からないのかすら分からない」**
+
+となった場合も、それ自体が重要なフィードバックです。
+
+そのままIssueへ、
 
 > **「何を見ているのか分からない」**
 
 と書いてもらって構いません。
 
+READMEの説明不足として扱います。
+
 ## License
 
-Apache-2.0. [LICENSE](LICENSE) を参照してください。
+Apache-2.0で公開しています。詳しくは [LICENSE](LICENSE) を参照してください。
