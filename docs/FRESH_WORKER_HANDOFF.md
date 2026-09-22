@@ -67,14 +67,20 @@ Forged PASS != Valid Handoff
 
 ```text
 admitted actions
-  = Worker allowed actions
-    INTERSECT
-    Baseline allowed actions
+  = the single intended action
+    after KY Gate PASS
 
 forbidden actions
   = Worker forbidden actions
     UNION
     Baseline forbidden actions
+```
+
+The handoff deliberately does **not** forward the Worker's wider allowed scope even when it is inside the baseline.
+
+```text
+Allowed Somewhere != Needed In This Bounce
+One Bounce -> One Intended Action
 ```
 
 The union for forbidden scope is intentionally conservative.
