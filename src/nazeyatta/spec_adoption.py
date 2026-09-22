@@ -179,7 +179,11 @@ def _validate_record(record: dict[str, Any]) -> None:
             "record.recorded_by.type must be human, workflow, or adapter"
         )
     _string(recorded_by.get("identifier"), "record.recorded_by.identifier", max_len=128)
-    _timestamp(record.get("recorded_at"), "record.recorded_at")
+    recorded_at = _timestamp(record.get("recorded_at"), "record.recorded_at")
+    if valid_from < recorded_at:
+        raise SpecAdoptionError(
+            "record.valid_from must not predate record.recorded_at"
+        )
 
     if record.get("authority_authenticated") is not False:
         raise SpecAdoptionError("record.authority_authenticated must be false")
