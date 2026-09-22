@@ -462,7 +462,28 @@ AI:
 
 なら、**その食い違いを作業前に見つけ、BLOCK（停止）などの判定につなげる**、というのが原点の発想です。
 
-ただし、この「AI自身のKYと実際の許可範囲を自動で比較して判定する部分」は、現在のalpha版ではまだ一連の機能として実装されていません。
+現在のalpha版では、**AI自身に作業前KYを自動生成させるところから実行までを、一連の自律フローとして動かす機能**はまだ実装されていません。
+
+一方で、その原点に必要な機械的な部品は一段進みました。現在のRepositoryには、Workerから受け取ったKY申告を型付きデータとして扱い、独立した基準と決定論的に比較するKY Gate、PASS後のFresh Handoff、境界状態の変化を見てRe-KYを判断するcontractがあります。さらに、固定されたローカルfixtureをFresh Processで読み取るread-only dogfoodまで実装されています。
+
+つまり、
+
+~~~text
+AI自身がKYを自動生成して
+そのまま本番作業まで自律実行
+!=
+現在のalpha
+
+型付きKY申告
+-> 決定論的な照合
+-> bounded handoff
+-> 境界観測 / Re-KY判定
+-> 固定fixtureでのdogfood
+=
+現在実装されている実験的な経路
+~~~
+
+です。
 
 ここで重要なのは：
 
@@ -478,19 +499,51 @@ AI自身の発言
 
 ### 現在のalpha版では
 
-この原点にある、
+原点にある、
 
-> **AI自身に作業前KYを生成させ、その内容まで自動で検査する一連の流れ**
+> **AI自身に作業前KYを自動生成させること**
 
-は、まだ**一連の流れとして自動化されていません**。
+は、まだ自動化されていません。
 
-現在実装されている中心部分は、
+一方、外から渡されたKY申告を機械的に扱う経路は、次のところまで実装されています。
 
-> **外から渡された作業内容・確認情報・ルールを、決められた方法で照らし合わせ、作業前の判定とチェック記録を返す部分**
+~~~text
+型付きのWorker KY申告
+        |
+        v
+独立したValidationBaselineとの
+決定論的な照合
+        |
+        v
+Fresh Handoff
+        |
+        v
+Boundary Observation / Re-KY
+        |
+        v
+固定fixtureを使った
+Fresh Process read-only dogfood
+~~~
 
-です。
+さらに、ValidationBaselineがどのsource snapshotと結び付いていたかを記録するDerivation Record、dogfood用の小さなDerivationSpec、そのSpecをどのscope/lifecycleで採用したと記録するSpecAdoptionRecordもあります。
 
-つまり、**原点にあるAI自身の作業前KYは今後育てる重要な部分で、現在のalpha版はその土台となるValidator側を先に実装している**、という状態です。
+ただし、これらは**実験的なcontractとdogfood**です。
+
+~~~text
+Fixtureで動いた
+!=
+Productionで自動運用できる
+
+RECORD_BOUND
+!=
+そのAuthorityが本物だと認証済み
+
+PROVENANCE_BOUND
+!=
+意味的・規範的に正しいと証明済み
+~~~
+
+NazeYatta自身が本番のIAM・PKI・万能な権限管理システムになったわけではありません。
 
 猫だらけの表示は意図的にふざけています。  
 でも、確認できていないことを「たぶん大丈夫」にしない、という考え方は真面目です。
@@ -540,20 +593,38 @@ NazeYattaは、まだ**開発途中の実験版（alpha版）**です。
 - 作業内容やルール一式に識別用のfingerprint（ハッシュ値）を付ける
 - 確認情報の出所を記録できる、実験的なv0.2形式を扱う
 - ルール違反が起きた後の振り返り用テンプレートを出す
+- 型付きのWorker KY申告を、独立したValidationBaselineと決定論的に照合する
+- PASSした申告から、1回の作業境界用のFresh Handoffを作る
+- 境界状態を比較して、CONTINUE / Re-KYを判定する
+- 固定ローカルfixtureをFresh Processで読み取るread-only dogfoodを実行する
+- BaselineDerivationRecord / bounded DerivationSpec / SpecAdoptionRecordを使った実験的なprovenance bindingを行う
 - 自動テストで基本動作を検証する
 
 ### まだ自動化できていないこと
 
-- AI自身に「今日の作業・危険・許可範囲」を作業前KYとして自動生成させ、その内容まで一連で検査する
-- 実際に作業中のAIやツールを観測し続ける
+- AI自身に「今日の作業・危険・許可範囲」を作業前KYとして自動生成させる
+- Production環境のsource/runtime adapterで、実際に作業中のAIやツールを継続観測する
 - BLOCK判定になった操作を、NazeYatta単体で強制停止する
 - 確認情報を出した人・システムが、本当にその情報を保証する権限を持つか自動認証する
-- ルールを決めた人・組織が、本当にそのルールを決める権限を持つか自動認証する
+- ルールやDerivationSpecを採用した人・組織が、本当にそのscopeの決定権限を持つか自動認証する
+- DerivationSpecの内容が、その組織・domainにとって規範的に正しいと自動証明する
 - 問題を見つけた後、自動で修復作業まで行う
 
-最後に、この4本はNazeYattaの重要な境界です。
+最後に、現在の重要な境界です。
 
 ~~~text
+Fixtureでのdogfood
+  !=
+Production Runtime
+
+RECORD_BOUND
+  !=
+Authority認証済み
+
+PROVENANCE_BOUND
+  !=
+意味的な正しさを検証済み
+
 Unknown（不明・未確認）
   !=
 Safe（安全）
