@@ -163,3 +163,19 @@ def test_record_cannot_grant_execution_authority():
             expected_scope=EXPECTED_SCOPE,
             evaluated_at="2026-09-22T17:16:00+00:00",
         )
+
+
+def test_record_cannot_silently_backdate_adoption():
+    spec = load_json(SPEC_PATH)
+    record = load_json(RECORD_PATH)
+    record["recorded_at"] = "2026-09-22T17:16:00+00:00"
+    record["valid_from"] = "2026-09-22T17:15:00+00:00"
+
+    import pytest
+    with pytest.raises(Exception, match="must not predate"):
+        evaluate_spec_adoption(
+            spec,
+            record,
+            expected_scope=EXPECTED_SCOPE,
+            evaluated_at="2026-09-22T17:17:00+00:00",
+        )
