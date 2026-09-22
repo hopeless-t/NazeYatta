@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:baseline-derivation-record:0.1",
+  "title": "NazeYatta Baseline Derivation Record",
+  "description": "Provenance record binding one exact ValidationBaseline to observed source snapshots and derivation metadata. It does not prove semantic correctness.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "derivation_id",
+    "classification",
+    "task_id",
+    "baseline_id",
+    "baseline_fingerprint",
+    "source_snapshots",
+    "prepared_by",
+    "derivation_method",
+    "prepared_at",
+    "semantic_correctness_claimed",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "derivation_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "classification": {"const": "BASELINE_DERIVATION_RECORD"},
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "baseline_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "baseline_fingerprint": {"type": "string", "minLength": 1, "maxLength": 256},
+    "source_snapshots": {
+      "type": "object",
+      "required": ["authority_binding", "policy_binding", "evidence_bindings"],
+      "properties": {
+        "authority_binding": {"$ref": "#/$defs/sourceBinding"},
+        "policy_binding": {"$ref": "#/$defs/sourceBinding"},
+        "evidence_bindings": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {"$ref": "#/$defs/evidenceBinding"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "prepared_by": {
+      "type": "object",
+      "required": ["type", "identifier"],
+      "properties": {
+        "type": {"enum": ["human", "adapter", "workflow"]},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 128}
+      },
+      "additionalProperties": false
+    },
+    "derivation_method": {
+      "type": "object",
+      "required": ["type", "identifier", "version"],
+      "properties": {
+        "type": {"enum": ["manual", "deterministic_adapter", "workflow"]},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 128},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128}
+      },
+      "additionalProperties": false
+    },
+    "prepared_at": {"type": "string", "format": "date-time"},
+    "semantic_correctness_claimed": {"const": false},
+    "authority_granted": {"const": false}
+  },
+  "$defs": {
+    "sourceBinding": {
+      "type": "object",
+      "required": ["ref", "observation_state", "binding_token"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1, "maxLength": 256},
+        "observation_state": {"const": "OBSERVED"},
+        "binding_token": {"type": "string", "minLength": 1, "maxLength": 256}
+      },
+      "additionalProperties": false
+    },
+    "evidenceBinding": {
+      "type": "object",
+      "required": ["ref", "observation_state", "state", "binding_token"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1, "maxLength": 256},
+        "observation_state": {"const": "OBSERVED"},
+        "state": {"enum": ["VERIFIED", "PRESENT", "STALE", "INVALID", "MISSING", "UNKNOWN"]},
+        "binding_token": {"type": "string", "minLength": 1, "maxLength": 256}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
