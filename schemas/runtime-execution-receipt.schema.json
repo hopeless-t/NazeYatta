@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:runtime-execution-receipt:0.1",
+  "title": "NazeYatta Runtime Execution Receipt",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "classification",
+    "task_id",
+    "handoff_fingerprint",
+    "operation",
+    "target",
+    "content_sha256",
+    "bytes_read",
+    "before_target_identity_fingerprint",
+    "after_target_identity_fingerprint",
+    "target_identity_unchanged",
+    "worker_pid",
+    "outcome",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "classification": {"const": "RUNTIME_EXECUTION_RECEIPT"},
+    "task_id": {"type": "string", "minLength": 1},
+    "handoff_fingerprint": {"type": "string", "minLength": 1},
+    "operation": {"const": "read"},
+    "target": {"type": "string", "minLength": 1},
+    "content_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "bytes_read": {"type": "integer", "minimum": 0},
+    "before_target_identity_fingerprint": {"type": "string", "minLength": 1},
+    "after_target_identity_fingerprint": {"type": "string", "minLength": 1},
+    "target_identity_unchanged": {"type": "boolean"},
+    "worker_pid": {"type": "integer", "minimum": 1},
+    "outcome": {"enum": ["READ_OK", "TARGET_IDENTITY_CHANGED"]},
+    "authority_granted": {"const": false}
+  },
+  "additionalProperties": false
+}
