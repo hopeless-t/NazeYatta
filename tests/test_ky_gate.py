@@ -176,3 +176,18 @@ def test_naive_baseline_timestamp_is_rejected():
     baseline["prepared_at"] = "2026-09-22T00:00:00"
     with pytest.raises(KYGateError, match="timezone"):
         evaluate_ky_gate(declaration, baseline)
+
+
+def test_empty_worker_awareness_lists_are_valid_but_require_review_when_baseline_requires_items():
+    declaration, baseline = load_examples()
+    declaration["understood_forbidden_scope"] = []
+    declaration["recognized_hazards"] = []
+    declaration["planned_controls"] = []
+    declaration["stop_conditions"] = []
+    result = evaluate_ky_gate(declaration, baseline)
+    assert result.outcome == "REVIEW"
+    codes = {f["code"] for f in result.findings}
+    assert "FORBIDDEN_SCOPE_NOT_RECOGNIZED" in codes
+    assert "REQUIRED_HAZARD_NOT_RECOGNIZED" in codes
+    assert "REQUIRED_CONTROL_NOT_DECLARED" in codes
+    assert "REQUIRED_STOP_CONDITION_NOT_DECLARED" in codes
