@@ -130,8 +130,6 @@ def _action_set(value: Any, where: str, *, require_non_empty: bool) -> set[tuple
 def _ky_ids(value: Any, where: str) -> set[str]:
     if not isinstance(value, list):
         raise KYGateError(f"{where} must be a list")
-    if not value:
-        raise KYGateError(f"{where} must not be empty")
     if len(value) > 32:
         raise KYGateError(f"{where} must contain at most 32 items")
     ids: list[str] = []
@@ -251,7 +249,7 @@ def evaluate_ky_gate(
     worker_forbidden = _action_set(
         declaration.get("understood_forbidden_scope"),
         "declaration.understood_forbidden_scope",
-        require_non_empty=True,
+        require_non_empty=False,
     )
 
     worker_hazards = _ky_ids(
