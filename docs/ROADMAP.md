@@ -13,7 +13,7 @@
 ## v0.2 candidates
 
 - implemented alpha input lane: claim-to-Evidence-Record references with conservative effective-state resolution
-- runtime structural Task Contract hardening (full JSON Schema enforcement remains pending parity work)
+- runtime structural Task Contract hardening + dependency-free schema/runtime parity guard (full JSON Schema enforcement remains separate)
 - explicit policy provenance metadata
 - reusable receipt JSON files via deterministic no-clobber `--receipt-out` artifacts
 - receipt freshness / target-state binding
