@@ -1,0 +1,247 @@
+name: Publish NazeYatta 0.2.0a2 to PyPI
+
+on:
+  push:
+    branches:
+      - release/0.2.0a2-pypi
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TAG: v0.2.0a2
+  VERSION: 0.2.0a2
+  FINAL_COMMIT: 4a119eeec32fa1a17c2c8fa790940462d12460ed
+  WHEEL_SHA256: a96bda081d850543933ab5c8b0f524f0b6276ac788a52f0d815a1b62e40c2538
+  SDIST_SHA256: 496bbb5af5d89e78e48b2551d2245d0e7b60bbd8adda54a55966235ba5650935
+
+jobs:
+  publish-pypi:
+    name: Publish exact GitHub release assets to PyPI
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert workflow-only instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$FINAL_COMMIT" HEAD
+          CHANGED="$(git diff --name-only "$FINAL_COMMIT"...HEAD)"
+          test "$CHANGED" = ".github/workflows/publish-pypi-0.2.0a1.yml" || {
+            echo "unexpected PyPI publication-branch delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Verify GitHub release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')"
+          test "$TAG_SHA" = "$FINAL_COMMIT"
+          RELEASE_TARGET="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.target_commitish')"
+          test "$RELEASE_TARGET" = "$FINAL_COMMIT"
+          PRERELEASE="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.prerelease')"
+          test "$PRERELEASE" = "true"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download exact GitHub Release distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pypi-dist evidence
+          gh release download "$TAG"             --repo "$GITHUB_REPOSITORY"             --dir pypi-dist             --pattern 'nazeyatta-0.2.0a2-py3-none-any.whl'             --pattern 'nazeyatta-0.2.0a2.tar.gz'
+
+          test "$(sha256sum pypi-dist/nazeyatta-0.2.0a2-py3-none-any.whl | awk '{print $1}')" = "$WHEEL_SHA256"
+          test "$(sha256sum pypi-dist/nazeyatta-0.2.0a2.tar.gz | awk '{print $1}')" = "$SDIST_SHA256"
+
+          {
+            echo "$WHEEL_SHA256  nazeyatta-0.2.0a2-py3-none-any.whl"
+            echo "$SDIST_SHA256  nazeyatta-0.2.0a2.tar.gz"
+          } > evidence/EXPECTED_SHA256SUMS.txt
+
+      - name: Validate distribution metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip twine
+          python -m twine check pypi-dist/*
+
+      - name: Inspect current PyPI state
+        id: pypi_state
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o evidence/pypi-before.json -w '%{http_code}'             "https://pypi.org/pypi/nazeyatta/$VERSION/json")"
+
+          if [ "$HTTP" = "404" ]; then
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "version_state=not_found" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          test "$HTTP" = "200"
+
+          WHEEL="$(jq -r '
+            .urls[] |
+            select(.filename == "nazeyatta-0.2.0a2-py3-none-any.whl") |
+            .digests.sha256
+          ' evidence/pypi-before.json)"
+          SDIST="$(jq -r '
+            .urls[] |
+            select(.filename == "nazeyatta-0.2.0a2.tar.gz") |
+            .digests.sha256
+          ' evidence/pypi-before.json)"
+
+          test "$WHEEL" = "$WHEEL_SHA256"
+          test "$SDIST" = "$SDIST_SHA256"
+          echo "already_published=true" >> "$GITHUB_OUTPUT"
+          echo "version_state=exact_version_already_present" >> "$GITHUB_OUTPUT"
+
+      - name: Publish through existing PyPI Trusted Publisher
+        id: trusted_publish
+        if: steps.pypi_state.outputs.already_published != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi-dist/
+          print-hash: true
+
+      - name: Wait for exact PyPI metadata and verify hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://pypi.org/pypi/nazeyatta/$VERSION/json"
+          FOUND=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$URL" -o evidence/pypi-after.json; then
+              WHEEL="$(jq -r '
+                .urls[] |
+                select(.filename == "nazeyatta-0.2.0a2-py3-none-any.whl") |
+                .digests.sha256
+              ' evidence/pypi-after.json)"
+              SDIST="$(jq -r '
+                .urls[] |
+                select(.filename == "nazeyatta-0.2.0a2.tar.gz") |
+                .digests.sha256
+              ' evidence/pypi-after.json)"
+              if [ "$WHEEL" = "$WHEEL_SHA256" ] && [ "$SDIST" = "$SDIST_SHA256" ]; then
+                FOUND=1
+                break
+              fi
+            fi
+            sleep 10
+          done
+          test "$FOUND" -eq 1
+
+          jq '{
+            info: {
+              name: .info.name,
+              version: .info.version,
+              requires_python: .info.requires_python,
+              project_urls: .info.project_urls
+            },
+            files: [.urls[] | {
+              filename,
+              packagetype,
+              size,
+              sha256: .digests.sha256,
+              upload_time_iso_8601
+            }]
+          }' evidence/pypi-after.json > evidence/pypi-summary.json
+
+      - name: Re-download PyPI-hosted files and verify exact SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pypi-redownload
+          WHEEL_URL="$(jq -r '.urls[] | select(.filename == "nazeyatta-0.2.0a2-py3-none-any.whl") | .url' evidence/pypi-after.json)"
+          SDIST_URL="$(jq -r '.urls[] | select(.filename == "nazeyatta-0.2.0a2.tar.gz") | .url' evidence/pypi-after.json)"
+          test -n "$WHEEL_URL"
+          test -n "$SDIST_URL"
+
+          curl -fL "$WHEEL_URL" -o pypi-redownload/nazeyatta-0.2.0a2-py3-none-any.whl
+          curl -fL "$SDIST_URL" -o pypi-redownload/nazeyatta-0.2.0a2.tar.gz
+
+          (
+            cd pypi-redownload
+            sha256sum -c ../evidence/EXPECTED_SHA256SUMS.txt
+          ) | tee evidence/pypi-redownload-sha256.txt
+
+      - name: Fresh install from PyPI public index
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .pypi-verify-venv
+          . .pypi-verify-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install             --no-cache-dir             --index-url https://pypi.org/simple/             "nazeyatta==$VERSION"
+
+          mkdir -p /tmp/nazeyatta-pypi-verify
+          cd /tmp/nazeyatta-pypi-verify
+
+          test "$(nazeyatta --version)" = "nazeyatta 0.2.0a2"
+
+          nazeyatta example publish-photo > publish-photo.yaml
+          set +e
+          nazeyatta check publish-photo.yaml > publish-photo-result.txt 2>&1
+          BLOCK_EXIT=$?
+          set -e
+          test "$BLOCK_EXIT" -eq 2
+          grep -q "BLOCK" publish-photo-result.txt
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" publish-photo-result.txt
+
+          nazeyatta example safe-read > safe-read.yaml
+          nazeyatta check safe-read.yaml > safe-read-result.txt 2>&1
+          PASS_EXIT=$?
+          test "$PASS_EXIT" -eq 0
+          grep -q "PASS" safe-read-result.txt
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" safe-read-result.txt
+
+          python - <<'PY' | tee "$GITHUB_WORKSPACE/evidence/pypi-install.txt"
+          from importlib.metadata import metadata, version
+          import nazeyatta
+
+          assert version("nazeyatta") == "0.2.0a2"
+          assert nazeyatta.__version__ == "0.2.0a2"
+          md = metadata("nazeyatta")
+          urls = set(md.get_all("Project-URL") or [])
+          assert "Homepage, https://github.com/hopeless-t/NazeYatta" in urls
+          assert "Programming Language :: Python :: 3.12" in set(md.get_all("Classifier") or [])
+          print("pypi_package_version=0.2.0a2")
+          print("pypi_runtime_version=0.2.0a2")
+          print("pypi_cli_version=nazeyatta 0.2.0a2")
+          print("pypi_project_urls=PASS")
+          print("publish_photo_exit=2")
+          print("safe_read_exit=0")
+          PY
+
+      - name: Record publication route
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "github_release_tag=$TAG"
+            echo "final_commit=$FINAL_COMMIT"
+            echo "pypi_version_state_before=${{ steps.pypi_state.outputs.version_state }}"
+            echo "trusted_publish_outcome=${{ steps.trusted_publish.outcome }}"
+            echo "authentication_route=GitHub_OIDC_Trusted_Publishing"
+          } > evidence/publication-route.txt
+
+      - name: Upload PyPI publication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a2-pypi-publication-evidence
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
