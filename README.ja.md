@@ -134,12 +134,12 @@ NazeYattaが役立つのは、複数のAIや自動化処理で、次のような
 
 Python 3.11以上が必要です。
 
-PyPIから `0.2.0a3` technical prerelease を入れ、同梱Exampleを取り出します。
+PyPIから `0.2.0a4` technical prerelease を入れ、同梱Exampleを取り出します。
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a3"
+python -m pip install "nazeyatta==0.2.0a4"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
