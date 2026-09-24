@@ -48,7 +48,7 @@ def test_stdin_json_receipt_is_machine_readable_and_non_authorizing():
     receipt = json.loads(proc.stdout)
     assert receipt["outcome"] == "PASS"
     assert receipt["authority_granted"] is False
-    assert receipt["evaluator_version"] == "0.2.0a3"
+    assert receipt["evaluator_version"] == "0.2.0a4"
 
 
 def test_packaged_example_output_can_feed_stdin_check():
