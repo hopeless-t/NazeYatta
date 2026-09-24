@@ -16,7 +16,7 @@
 - runtime structural Task Contract hardening + dependency-free schema/runtime parity guard (full JSON Schema enforcement remains separate)
 - explicit policy provenance metadata
 - reusable receipt JSON files via deterministic no-clobber `--receipt-out` artifacts
-- receipt freshness / target-state binding
+- reusable Boundary Observation construction (implemented prerequisite); receipt freshness / target-state binding remains next-stage work
 - runtime gate adapter interface
 - separate override / authority record
 - violation event schema
