@@ -15,7 +15,7 @@
 - implemented alpha input lane: claim-to-Evidence-Record references with conservative effective-state resolution
 - JSON Schema validation on CLI input
 - explicit policy provenance metadata
-- reusable receipt JSON files
+- reusable receipt JSON files via deterministic no-clobber `--receipt-out` artifacts
 - receipt freshness / target-state binding
 - runtime gate adapter interface
 - separate override / authority record
