@@ -6,7 +6,11 @@ import pytest
 from nazeyatta.evaluator import load_yaml, stable_hash
 from nazeyatta.fresh_handoff import compile_fresh_handoff
 from nazeyatta.ky_gate import evaluate_ky_gate
-from nazeyatta.reky_gate import ObservationGateError, evaluate_reky_gate
+from nazeyatta.reky_gate import (
+    ObservationGateError,
+    build_boundary_observation,
+    evaluate_reky_gate,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -216,3 +220,65 @@ def test_decision_fingerprints_are_deterministic():
     a = evaluate_reky_gate(handoff, before, after)
     b = evaluate_reky_gate(handoff, before, after)
     assert asdict(a) == asdict(b)
+
+
+def test_builder_binds_observation_to_exact_handoff():
+    handoff, before, _ = load_context()
+    source_snapshot = {
+        "authority_binding": before["authority_binding"],
+        "policy_binding": before["policy_binding"],
+        "evidence_bindings": before["evidence_bindings"],
+    }
+    built = build_boundary_observation(
+        handoff,
+        observation_id="OBS-BUILDER-001",
+        target_binding=before["target_binding"],
+        source_snapshot=source_snapshot,
+        observed_by=before["observed_by"],
+        observed_at=before["observed_at"],
+    )
+
+    assert built["task_id"] == handoff.task_id
+    assert built["handoff_fingerprint"] == stable_hash(asdict(handoff))
+    assert built["target_binding"] == before["target_binding"]
+
+
+def test_builder_rejects_target_not_bound_to_handoff():
+    handoff, before, _ = load_context()
+    source_snapshot = {
+        "authority_binding": before["authority_binding"],
+        "policy_binding": before["policy_binding"],
+        "evidence_bindings": before["evidence_bindings"],
+    }
+    target = dict(before["target_binding"])
+    target["identifier"] = "production"
+
+    with pytest.raises(ObservationGateError, match="target does not bind"):
+        build_boundary_observation(
+            handoff,
+            observation_id="OBS-BUILDER-BAD-TARGET",
+            target_binding=target,
+            source_snapshot=source_snapshot,
+            observed_by=before["observed_by"],
+            observed_at=before["observed_at"],
+        )
+
+
+def test_builder_rejects_source_refs_not_bound_to_handoff():
+    handoff, before, _ = load_context()
+    source_snapshot = {
+        "authority_binding": dict(before["authority_binding"]),
+        "policy_binding": before["policy_binding"],
+        "evidence_bindings": before["evidence_bindings"],
+    }
+    source_snapshot["authority_binding"]["ref"] = "authority://other"
+
+    with pytest.raises(ObservationGateError, match="authority ref does not bind"):
+        build_boundary_observation(
+            handoff,
+            observation_id="OBS-BUILDER-BAD-SOURCE",
+            target_binding=before["target_binding"],
+            source_snapshot=source_snapshot,
+            observed_by=before["observed_by"],
+            observed_at=before["observed_at"],
+        )
