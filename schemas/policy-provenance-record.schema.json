@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:policy-provenance-record:0.1",
+  "title": "NazeYatta Policy Provenance Record",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "provenance_id",
+    "classification",
+    "policy_bundle_id",
+    "policy_ref",
+    "policy_bundle_fingerprint",
+    "source_ref",
+    "source_binding_token",
+    "claimed_authority_ref",
+    "scope_ref",
+    "status",
+    "valid_from",
+    "expires_at",
+    "recorded_by",
+    "recorded_at",
+    "authority_authenticated",
+    "normative_correctness_verified",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "provenance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "classification": {
+      "const": "POLICY_PROVENANCE_RECORD"
+    },
+    "policy_bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_bundle_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_binding_token": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claimed_authority_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "ACTIVE",
+        "REVOKED"
+      ]
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "recorded_by": {
+      "type": "object",
+      "required": [
+        "type",
+        "identifier"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "human",
+            "workflow",
+            "adapter"
+          ]
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "authority_authenticated": {
+      "const": false
+    },
+    "normative_correctness_verified": {
+      "const": false
+    },
+    "authority_granted": {
+      "const": false
+    }
+  },
+  "additionalProperties": false
+}
