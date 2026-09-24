@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from nazeyatta.evaluator import load_yaml, stable_hash
 from nazeyatta.fresh_handoff import compile_fresh_handoff
 from nazeyatta.ky_gate import evaluate_ky_gate
-from nazeyatta.reky_gate import evaluate_reky_gate
+from nazeyatta.reky_gate import build_boundary_observation, evaluate_reky_gate
 from nazeyatta.runtime_fixture_sources import observe_fixture_sources
 
 
@@ -108,42 +108,38 @@ def main() -> int:
     if not receipt["target_identity_unchanged"]:
         raise RuntimeError("target identity changed during safe-read dogfood")
 
-    common = {
-        "schema_version": "0.2",
-        "classification": "BOUNDARY_OBSERVATION",
-        "task_id": handoff.task_id,
-        "handoff_fingerprint": handoff_fingerprint,
-        "observed_by": {
-            "type": "workflow",
-            "identifier": "dogfood-safe-read-orchestrator",
-        },
+    observer = {
+        "type": "workflow",
+        "identifier": "dogfood-safe-read-orchestrator",
     }
-    before = {
-        **common,
-        "observation_id": "DOGFOOD-BOUNDARY-BEFORE",
-        "target_binding": {
+    before = build_boundary_observation(
+        handoff,
+        observation_id="DOGFOOD-BOUNDARY-BEFORE",
+        target_binding={
             "kind": "file",
             "identifier": receipt["target"],
             "identity_fingerprint": receipt[
                 "before_target_identity_fingerprint"
             ],
         },
-        **before_sources,
-        "observed_at": before_time.isoformat(),
-    }
-    after = {
-        **common,
-        "observation_id": "DOGFOOD-BOUNDARY-AFTER",
-        "target_binding": {
+        source_snapshot=before_sources,
+        observed_by=observer,
+        observed_at=before_time.isoformat(),
+    )
+    after = build_boundary_observation(
+        handoff,
+        observation_id="DOGFOOD-BOUNDARY-AFTER",
+        target_binding={
             "kind": "file",
             "identifier": receipt["target"],
             "identity_fingerprint": receipt[
                 "after_target_identity_fingerprint"
             ],
         },
-        **after_sources,
-        "observed_at": after_time.isoformat(),
-    }
+        source_snapshot=after_sources,
+        observed_by=observer,
+        observed_at=after_time.isoformat(),
+    )
 
     reky = evaluate_reky_gate(handoff, before, after)
     if reky.outcome != "CONTINUE":
