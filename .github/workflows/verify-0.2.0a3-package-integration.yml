@@ -1,0 +1,198 @@
+name: Verify 0.2.0a3 Package Integration Surface
+
+on:
+  push:
+    branches:
+      - verify/0.2.0a3-package-integration
+
+permissions:
+  contents: read
+
+env:
+  CANDIDATE: 7308bb319c8ea9af170b194fc5cb40296d6fa082
+
+jobs:
+  build:
+    name: Build exact development candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Assert verification-only instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$CANDIDATE" HEAD
+          CHANGED="$(git diff --name-only "$CANDIDATE"...HEAD)"
+          test "$CHANGED" = ".github/workflows/verify-0.2.0a3-package-integration.yml" || {
+            echo "unexpected verification-branch delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Install build and source-test dependencies
+        run: |
+          python -m pip install --upgrade pip build
+          python -m pip install -e . pytest
+
+      - name: Run source suite
+        run: python -m pytest -q
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Record readiness hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          {
+            echo "candidate=$CANDIDATE"
+            echo "version=0.2.0a3"
+            echo
+            ls -l dist/
+            echo
+            sha256sum dist/*
+          } | tee evidence/build-receipt.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a3-integration-dist
+          path: |
+            dist/*
+            evidence/build-receipt.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  verify:
+    name: Installed wheel / Python ${{ matrix.python-version }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a3-integration-dist
+          path: candidate-artifact
+
+      - name: Fresh install exact built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .verify-venv
+          . .verify-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install candidate-artifact/dist/*.whl
+
+      - name: Verify core schema package surface away from source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          mkdir -p /tmp/nazeyatta-a3-verify
+          cd /tmp/nazeyatta-a3-verify
+
+          test "$(nazeyatta --version)" = "nazeyatta 0.2.0a3"
+
+          nazeyatta schema task > task.schema.json
+          nazeyatta schema evidence > evidence.schema.json
+          nazeyatta schema receipt > receipt.schema.json
+
+          cmp task.schema.json "$GITHUB_WORKSPACE/schemas/task.schema.json"
+          cmp evidence.schema.json "$GITHUB_WORKSPACE/schemas/evidence.schema.json"
+          cmp receipt.schema.json "$GITHUB_WORKSPACE/schemas/receipt.schema.json"
+
+          python - <<'PY'
+          import json
+          expected = {
+              "task.schema.json": "urn:nazeyatta:schema:task:0.2",
+              "evidence.schema.json": "urn:nazeyatta:schema:evidence:0.2",
+              "receipt.schema.json": "urn:nazeyatta:schema:receipt:0.2",
+          }
+          for path, schema_id in expected.items():
+              with open(path, encoding="utf-8") as f:
+                  assert json.load(f)["$id"] == schema_id
+          print("packaged_core_schemas=PASS")
+          PY
+
+      - name: Verify stdin pipeline from installed wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          cd /tmp/nazeyatta-a3-verify
+
+          nazeyatta example safe-read | nazeyatta check - > safe-read.txt
+          SAFE_EXIT=$?
+          test "$SAFE_EXIT" -eq 0
+          grep -q "PASS" safe-read.txt
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" safe-read.txt
+
+          set +e
+          nazeyatta example publish-photo | nazeyatta check - > publish-photo.txt
+          BLOCK_EXIT=$?
+          set -e
+          test "$BLOCK_EXIT" -eq 2
+          grep -q "BLOCK" publish-photo.txt
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" publish-photo.txt
+
+          nazeyatta example safe-read | nazeyatta check - --json > safe-read.json
+          python - <<'PY'
+          import json
+          with open("safe-read.json", encoding="utf-8") as f:
+              receipt = json.load(f)
+          assert receipt["outcome"] == "PASS"
+          assert receipt["authority_granted"] is False
+          assert receipt["evaluator_version"] == "0.2.0a3"
+          print("stdin_json_receipt=PASS")
+          PY
+
+          echo "safe_read_exit=$SAFE_EXIT"
+          echo "publish_photo_exit=$BLOCK_EXIT"
+
+      - name: Capture evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          DEST="$GITHUB_WORKSPACE/evidence/python-${{ matrix.python-version }}"
+          mkdir -p "$DEST"
+          cd /tmp/nazeyatta-a3-verify
+          cp task.schema.json evidence.schema.json receipt.schema.json safe-read.txt publish-photo.txt safe-read.json "$DEST/"
+          {
+            echo "candidate=$CANDIDATE"
+            echo "python=$(python --version 2>&1)"
+            echo "package_version=$(python -c 'from importlib.metadata import version; print(version("nazeyatta"))')"
+            echo "cli_version=$(nazeyatta --version)"
+            echo "packaged_core_schemas=true"
+            echo "stdin_pipeline=true"
+            echo "safe_read_exit=0"
+            echo "publish_photo_exit=2"
+            echo "authority_granted=false"
+          } > "$DEST/summary.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a3-python-${{ matrix.python-version }}-integration-evidence
+          path: evidence/python-${{ matrix.python-version }}/
+          if-no-files-found: error
+          retention-days: 7
