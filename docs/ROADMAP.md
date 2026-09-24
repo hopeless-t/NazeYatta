@@ -81,6 +81,49 @@ Stable Package != Authority System
 PASS != Execution Authority
 ```
 
+## v1.1 closed-loop verification — Scope Freeze v0.1
+
+Human-approved scope:
+[Closed-loop Verification Kernel Scope Freeze v0.1](V1_1_CLOSED_LOOP_VERIFICATION_SCOPE_FREEZE_V0_1.md)
+
+The first 1.1 tranche is additive and verify-only:
+
+```text
+Preflight Receipt
+-> external caller / executor
+-> PostActionObservation
+-> exact-fact deterministic verification
+-> VERIFIED_SUCCESS / VERIFIED_FAILURE / UNKNOWN
+```
+
+Frozen product boundaries:
+
+- NazeYatta still does not execute actions;
+- exact facts only; no expression DSL;
+- exact request/observation identity binding;
+- UNKNOWN remains UNKNOWN;
+- an observed contradiction outranks unrelated UNKNOWN facts;
+- verification grants no execution or retry authority;
+- machine contracts remain neutral;
+- the human CLI may remain intentionally playful;
+- the first concrete dogfood is NazeYatta's own release path.
+
+Deferred:
+
+- DecisionProvider / Jev / Cua / LLM proposal lanes;
+- bounded effect permits;
+- retry/recovery engines;
+- HCE economics sidecars;
+- generic runtime adapters;
+- mini-orchestrator behavior.
+
+```text
+Cute Presentation != Weakened Semantics
+Execution Result != Verified Postcondition
+VerificationReceipt != Action Authority
+UNKNOWN != Permission To Retry
+```
+
 ## Integration-bound HOLD items
 
 Do not add generic framework code for these without a concrete consumer.
