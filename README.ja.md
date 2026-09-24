@@ -134,15 +134,21 @@ NazeYattaが役立つのは、複数のAIや自動化処理で、次のような
 
 Python 3.11以上が必要です。
 
+PyPIから `0.2.0a2` technical prerelease を入れ、同梱Exampleを取り出します。
+
 ~~~bash
-git clone https://github.com/hopeless-t/NazeYatta.git
-cd NazeYatta
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install -e .
+python -m pip install "nazeyatta==0.2.0a2"
 
-nazeyatta check examples/publish-photo.yaml
+nazeyatta --version
+nazeyatta example publish-photo > task.yaml
+nazeyatta check task.yaml
 ~~~
+
+`example` コマンドが行うのは、固定された同梱YAML Exampleを標準出力へコピーすることだけです。**Taskの評価や実行権限の付与は行いません。**
+
+ソースコードを変更・開発する場合はRepositoryをcloneしてください。開発参加手順は [CONTRIBUTING.md](CONTRIBUTING.md) にあります。
 
 この例では、
 
@@ -220,7 +226,8 @@ EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA
 ファイルなどを書き換えず、**読み取りだけを行う例**もあります。
 
 ~~~bash
-nazeyatta check examples/safe-read.yaml
+nazeyatta example safe-read > safe-read.yaml
+nazeyatta check safe-read.yaml
 ~~~
 
 こちらは PASS（チェック通過）になります。
@@ -321,7 +328,7 @@ NazeYattaには**基本ルールが最初から同梱**されているので、�
 プログラムから扱いやすいJSON形式でも結果を受け取れます。
 
 ~~~bash
-nazeyatta check examples/safe-read.yaml --json
+nazeyatta check safe-read.yaml --json
 ~~~
 
 チェック記録（receipt）には、判定結果だけでなく、
