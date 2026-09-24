@@ -1,4 +1,4 @@
-name: Publish GitHub Technical Prerelease
+name: Publish GitHub Release
 
 on:
   workflow_dispatch:
@@ -11,6 +11,14 @@ on:
         description: "Exact 40-character source commit to publish"
         required: true
         type: string
+      release_channel:
+        description: "Publish as a stable release or prerelease"
+        required: true
+        type: choice
+        default: prerelease
+        options:
+          - prerelease
+          - stable
 
 permissions:
   contents: read
@@ -28,6 +36,7 @@ jobs:
       VERSION: ${{ inputs.version }}
       FINAL_COMMIT: ${{ inputs.final_commit }}
       TAG: v${{ inputs.version }}
+      RELEASE_CHANNEL: ${{ inputs.release_channel }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,6 +65,19 @@ jobs:
           )"
           test "$SOURCE_VERSION" = "$VERSION"
           test "$TAG" = "v$SOURCE_VERSION"
+
+          case "$RELEASE_CHANNEL" in
+            stable)
+              [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+              ;;
+            prerelease)
+              [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+              ;;
+            *)
+              echo "unsupported release_channel: $RELEASE_CHANNEL" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Install build and test dependencies
         run: |
@@ -86,6 +108,7 @@ jobs:
             echo "version=$VERSION"
             echo "tag=$TAG"
             echo "final_commit=$FINAL_COMMIT"
+            echo "release_channel=$RELEASE_CHANNEL"
             echo "build_verified_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
             echo "external_target_write_performed=false"
             echo "publication_performed=false"
@@ -95,6 +118,7 @@ jobs:
             echo
             echo "- Version: $VERSION"
             echo "- Final commit: $FINAL_COMMIT"
+            echo "- Release channel: $RELEASE_CHANNEL"
             echo "- Environment approval required before GitHub Release write: release"
             echo
             echo "### SHA-256"
@@ -114,7 +138,7 @@ jobs:
           retention-days: 30
 
   publish-github:
-    name: Human-gated GitHub prerelease publication
+    name: Human-gated GitHub release publication
     needs: build-verify
     runs-on: ubuntu-latest
     environment: release
@@ -124,6 +148,7 @@ jobs:
       VERSION: ${{ inputs.version }}
       FINAL_COMMIT: ${{ inputs.final_commit }}
       TAG: v${{ inputs.version }}
+      RELEASE_CHANNEL: ${{ inputs.release_channel }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -156,8 +181,16 @@ jobs:
           SDIST_SHA="$(awk -v f="$SDIST" '$2 == f {print $1}' candidate/release-evidence/SHA256SUMS.txt)"
           test -n "$WHEEL_SHA"
           test -n "$SDIST_SHA"
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            RELEASE_SUMMARY="NazeYatta $VERSION is the stable command-line preflight core release."
+            CHANNEL_BOUNDARY="Stable CLI Core != Production Enforcement Platform"
+          else
+            RELEASE_SUMMARY="NazeYatta $VERSION is a technical prerelease."
+            CHANNEL_BOUNDARY="Technical Prerelease != Production Ready"
+          fi
+
           cat > release-notes.md <<EOF
-          NazeYatta $VERSION is a technical alpha prerelease.
+          $RELEASE_SUMMARY
 
           Verified final source:
           $FINAL_COMMIT
@@ -168,15 +201,15 @@ jobs:
 
           Important boundaries:
           PASS != Execution Authority
-          Technical Prerelease != Production Ready
+          $CHANNEL_BOUNDARY
           Release Published != Production Adoption
-          Exact Artifact Correlation != Freshness
+          Exact Artifact Correlation != Universal Freshness
 
-          External first-time Human onboarding acceptance remains PENDING under Issue #4.
+          External first-time Human onboarding observation remains open under Issue #4 and is not a stability gate for the supported CLI contract.
           Publication of this release passed the configured GitHub Environment release gate.
           EOF
 
-      - name: Observe live target and create GitHub prerelease
+      - name: Observe live target and create GitHub release
         shell: bash
         run: |
           set -euo pipefail
@@ -202,15 +235,28 @@ jobs:
           SDIST="candidate/dist/nazeyatta-${VERSION}.tar.gz"
           SUMS="candidate/release-evidence/SHA256SUMS.txt"
 
-          gh release create "$TAG" \
-            "$WHEEL" \
-            "$SDIST" \
-            "$SUMS" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$FINAL_COMMIT" \
-            --title "NazeYatta $VERSION — Technical Alpha" \
-            --notes-file release-notes.md \
-            --prerelease
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            RELEASE_TITLE="NazeYatta $VERSION"
+            gh release create "$TAG" \
+              "$WHEEL" \
+              "$SDIST" \
+              "$SUMS" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$FINAL_COMMIT" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md
+          else
+            RELEASE_TITLE="NazeYatta $VERSION — Technical Prerelease"
+            gh release create "$TAG" \
+              "$WHEEL" \
+              "$SDIST" \
+              "$SUMS" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$FINAL_COMMIT" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md \
+              --prerelease
+          fi
 
           python - "$OBSERVED_NS" "$WRITE_STARTED_NS" <<'PY' > publication-evidence/observation-to-write.txt
           import sys
@@ -235,8 +281,13 @@ jobs:
           jq -e --arg sha "$FINAL_COMMIT" '.object.sha == $sha' publication-evidence/tag-ref.json
 
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > publication-evidence/release.json
-          jq -e --arg tag "$TAG" --arg sha "$FINAL_COMMIT" \
-            '.tag_name == $tag and .prerelease == true and .target_commitish == $sha' \
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            EXPECTED_PRERELEASE=false
+          else
+            EXPECTED_PRERELEASE=true
+          fi
+          jq -e --arg tag "$TAG" --arg sha "$FINAL_COMMIT" --argjson prerelease "$EXPECTED_PRERELEASE" \
+            '.tag_name == $tag and .prerelease == $prerelease and .target_commitish == $sha' \
             publication-evidence/release.json
 
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir downloaded-release
