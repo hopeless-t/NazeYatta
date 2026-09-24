@@ -23,6 +23,18 @@ For rule contributions, include:
 
 For documentation contributions, a simple statement like “I could not understand this term from the README” is useful evidence. Please open an Issue with the section and what was unclear.
 
+## Concrete integration requests
+
+If you have a real tool, agent, CI job, service, or Human workflow that may use NazeYatta, please use the [Concrete integration request](https://github.com/hopeless-t/NazeYatta/issues/new?template=integration-request.yml) Issue Form.
+
+The form asks for the runtime operation, target identity, Task mapping, evidence producer, enforcement placement, and non-PASS behavior because those details are needed before held integration work can be resumed safely.
+
+Submitting a request does not make the mapping verified, grant implementation authority, or establish production adoption.
+
+```text
+Integration Request != Implementation Authority
+Concrete Mapping Submitted != Mapping Verified
+```
 Before submitting code:
 
 ```bash
