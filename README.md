@@ -33,6 +33,27 @@ NazeYatta does **not** grant permission to publish it.
 
 It only performs the preflight check and returns a reproducible result.
 
+## Try it in 30 seconds
+
+Requires Python 3.11+.
+
+~~~bash
+python -m venv .venv
+. .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install "nazeyatta==0.2.0a4"
+
+nazeyatta example publish-photo > task.yaml
+nazeyatta check task.yaml
+~~~
+
+Expected result: **BLOCK** — the bundled example deliberately leaves publication permission as `UNKNOWN`.
+
+That is the core behavior: if a required fact is not established, NazeYatta does not silently upgrade it to “probably fine.”
+
+> **PASS means the supplied preflight passed. PASS does not grant execution authority.**
+
+The longer walkthrough is in [Run one example](#run-one-example).
+
 ---
 
 ## The 30-second mental model
