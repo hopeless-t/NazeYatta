@@ -6,6 +6,7 @@ import re
 import sys
 from pathlib import Path
 
+from . import __version__
 from .evaluator import EVIDENCE_LANES, evaluate, load_yaml
 from .receipt_io import write_receipt_json
 
@@ -167,6 +168,7 @@ def cmd_debrief_template(args: argparse.Namespace) -> int:
 def main() -> int:
     _prepare_stdout()
     p = argparse.ArgumentParser(prog="nazeyatta")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
     c = sub.add_parser("check", help="run deterministic preflight KY")
