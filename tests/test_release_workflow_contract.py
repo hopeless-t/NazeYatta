@@ -23,6 +23,13 @@ def test_github_release_write_is_human_gated_and_manual_only():
     assert document["permissions"]["contents"] == "read"
     assert document["concurrency"]["group"] == "nazeyatta-release"
 
+    dispatch = document["on"]["workflow_dispatch"]
+    release_channel = dispatch["inputs"]["release_channel"]
+    assert release_channel["required"] == "true"
+    assert release_channel["type"] == "choice"
+    assert release_channel["default"] == "prerelease"
+    assert release_channel["options"] == ["prerelease", "stable"]
+
     build = document["jobs"]["build-verify"]
     publish = document["jobs"]["publish-github"]
     assert "environment" not in build
@@ -39,8 +46,13 @@ def test_github_release_write_is_human_gated_and_manual_only():
     assert "gh release create" in publish_text
     assert "target_observed_at=" in publish_text
     assert "write_started_at=" in publish_text
+    assert 'RELEASE_CHANNEL' in build_text
+    assert 'RELEASE_CHANNEL' in publish_text
+    assert '--prerelease' in publish_text
+    assert 'Stable CLI Core != Production Enforcement Platform' in publish_text
+    assert 'Technical Prerelease != Production Ready' in publish_text
     assert (
-        "External first-time Human onboarding acceptance remains PENDING under Issue #4."
+        "External first-time Human onboarding observation remains open under Issue #4"
         in publish_text
     )
 

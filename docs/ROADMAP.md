@@ -44,25 +44,57 @@ PROVENANCE_BOUND != Normative Correctness Verified
 RECORD_BOUND != Authority Authenticated
 ```
 
+## v1.0 stable CLI core — target contract
+
+The 1.0 target promotes the bounded command-line preflight core into the supported stable surface.
+
+Canonical contract:
+[STABLE_CORE_1_0.md](STABLE_CORE_1_0.md)
+
+The stable 1.x surface includes:
+
+- `nazeyatta check`, `example`, `schema`, and `--version`;
+- bounded file/stdin Task input;
+- fail-closed structural/input handling;
+- deterministic policy evaluation;
+- explicit evidence and outcome states;
+- conservative exit codes;
+- human-readable and JSON receipts;
+- deterministic task/policy fingerprints;
+- no-clobber receipt files;
+- the provenance-v0.2 lane plus the legacy-v0.1 compatibility lane;
+- Python 3.11 / 3.12 packaging from PyPI.
+
+The following do **not** block 1.0:
+
+- first-time Human onboarding acceptance under #4;
+- generic normative-correctness proof under #28;
+- universal runtime enforcement;
+- IAM/PKI authority authentication;
+- generic runtime adapters;
+- violation-trace production;
+- promotion of the bounded KY / FreshHandoff / Re-KY / derivation research contracts into the stable CLI guarantee.
+
+```text
+1.0 Stable CLI Core != Production Enforcement Platform
+Stable Package != Authority System
+PASS != Execution Authority
+```
+
 ## Integration-bound HOLD items
 
 Do not add generic framework code for these without a concrete consumer.
 
 ### Receipt freshness / target-state binding
 
-HOLD under #54.
+The first-party GitHub Release / PyPI publication consumer has now exercised a concrete target mapping and real observation -> write -> readback path under completed Issue #54.
 
-Needed before resumption:
+That establishes bounded evidence for that consumer. It does not create a universal freshness algorithm for unrelated consumers.
 
-```text
-exact generic Task semantics
--> explicit runtime operation mapping
--> explicit runtime target identity mapping
-```
-
-The current generic Task does not require a runtime target identity.
+Future consumers should supply their own explicit runtime operation and target mapping rather than inheriting a generic assumption.
 
 ```text
+Concrete Release Freshness Observed != Universal Freshness Guarantee
 Same task_id != Semantic Equivalence
 No Concrete Mapping != Permission To Invent Freshness
 ```
@@ -79,9 +111,9 @@ A broader adapter interface should be driven by the first concrete runtime consu
 
 ### Override / authority record
 
-HOLD on #10's external authority boundary.
+Issue #10 closed with the bounded authority decision: policy authority belongs to the relevant Human / team / organization and NazeYatta does not universally authenticate that authority.
 
-NazeYatta currently records claimed authority references and scope/lifecycle metadata, but it does not decide which identity or governance system authenticates those claims.
+NazeYatta records claimed authority references and scope/lifecycle metadata, but it does not decide which identity or governance system authenticates those claims.
 
 ```text
 Authority Attribution != Authority Authentication
@@ -142,4 +174,4 @@ BUILD LESS / ROUTE BETTER
 
 The generic non-integration-dependent 0.2 contract tranche is considered converged at this boundary.
 
-This does not imply a 0.2 release, production readiness, authority authentication, semantic correctness, or freshness verification.
+That converged tranche is now the basis for the bounded 1.0 stable CLI contract. Stable 1.0 does not imply a universal production enforcement platform, authority authentication, or normative correctness proof.
