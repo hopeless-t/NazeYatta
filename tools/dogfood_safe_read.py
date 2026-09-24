@@ -16,9 +16,10 @@ SOURCE_MANIFEST = SOURCE_ROOT / "manifest.json"
 
 sys.path.insert(0, str(ROOT / "src"))
 
-from nazeyatta.evaluator import load_yaml, stable_hash
+from nazeyatta.evaluator import evaluate, load_yaml, stable_hash
 from nazeyatta.fresh_handoff import compile_fresh_handoff
 from nazeyatta.ky_gate import evaluate_ky_gate
+from nazeyatta.preflight_runtime_correlation import build_preflight_runtime_correlation
 from nazeyatta.reky_gate import build_boundary_observation, evaluate_reky_gate
 from nazeyatta.runtime_fixture_sources import observe_fixture_sources
 
@@ -126,6 +127,47 @@ def main() -> int:
         observed_by=observer,
         observed_at=before_time.isoformat(),
     )
+    correlation_task = {
+        "task_id": handoff.task_id,
+        "action": {
+            "operation": "read",
+            "side_effect": "none",
+            "externality": "internal",
+        },
+        "worker": {
+            "required_capability": "read_repository",
+        },
+        "semantics": {
+            "critical_meaning_complete": True,
+        },
+        "evidence": {
+            "worker_capability_qualified": "VERIFIED",
+        },
+    }
+    correlation_policies = load_yaml(ROOT / "policies" / "generic" / "rules.yaml")
+    correlation_receipt = evaluate(correlation_task, correlation_policies)
+    if correlation_receipt.outcome != "PASS":
+        raise RuntimeError(
+            f"correlation preflight did not PASS: {correlation_receipt.outcome}"
+        )
+    correlation = build_preflight_runtime_correlation(
+        correlation_receipt,
+        correlation_task,
+        correlation_policies,
+        handoff,
+        before,
+    )
+    if correlation.correlation_outcome != "EXACT_ARTIFACTS_BOUND":
+        raise RuntimeError(
+            f"unexpected correlation outcome: {correlation.correlation_outcome!r}"
+        )
+    if correlation.semantic_equivalence_verified is not False:
+        raise RuntimeError("correlation must not claim semantic equivalence")
+    if correlation.freshness_verified is not False:
+        raise RuntimeError("correlation must not claim freshness")
+    if correlation.authority_granted is not False:
+        raise RuntimeError("correlation must not grant authority")
+
     after = build_boundary_observation(
         handoff,
         observation_id="DOGFOOD-BOUNDARY-AFTER",
@@ -173,6 +215,10 @@ def main() -> int:
         "reky_reason_codes": reason_codes,
         "fixture_reky_runtime_continuation_observed": True,
         "full_reky_runtime_continuation_claimed": False,
+        "preflight_runtime_correlation_observed": True,
+        "preflight_runtime_correlation_outcome": correlation.correlation_outcome,
+        "correlation_semantic_equivalence_verified": correlation.semantic_equivalence_verified,
+        "correlation_freshness_verified": correlation.freshness_verified,
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
