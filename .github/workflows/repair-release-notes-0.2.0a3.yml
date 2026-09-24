@@ -1,0 +1,109 @@
+name: Repair NazeYatta 0.2.0a3 release notes
+
+on:
+  push:
+    branches:
+      - release/0.2.0a3-notes-repair
+
+permissions:
+  contents: write
+
+env:
+  FINAL_COMMIT: 16b7b0ae5ba0c7e8dcd7e728dd6808a43c5095e8
+  TAG: v0.2.0a3
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert repair-only instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$FINAL_COMMIT" HEAD
+          CHANGED="$(git diff --name-only "$FINAL_COMMIT"...HEAD)"
+          test "$CHANGED" = ".github/workflows/repair-release-notes-0.2.0a3.yml"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')" = "$FINAL_COMMIT"
+
+      - name: Prepare literal release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<'EOF'
+          NazeYatta 0.2.0a3 is a technical alpha prerelease focused on a small integration surface for existing tools and automation.
+
+          Highlights:
+          - bounded UTF-8 Task YAML from stdin with `nazeyatta check -`;
+          - explicit rejection of `--policy -` so one stdin stream cannot ambiguously provide both Task and policy;
+          - packaged extraction of the existing Task, Evidence Record, and Receipt JSON Schemas with `nazeyatta schema task|evidence|receipt`;
+          - structured Concrete Integration Request intake for real runtime operation / target / evidence / enforcement mappings;
+          - 223-test final source suite;
+          - exact built-wheel verification on Python 3.11 and 3.12.
+
+          Verified installed-wheel behavior:
+          - package/runtime/Receipt evaluator version = 0.2.0a3;
+          - `safe-read` via stdin -> PASS / exit 0;
+          - `publish-photo` via stdin -> BLOCK / exit 2;
+          - packaged core schemas are readable from the installed wheel;
+          - `authority_granted = false`.
+
+          Important boundaries:
+
+          PASS != Execution Authority
+          Schema Export != New Schema Semantics
+          Stdin Support != Runtime Enforcement
+          Integration Request != Implementation Authority
+          Concrete Consumer Request != Production Adoption
+          Exact Artifact Correlation != Freshness
+          PROVENANCE_BOUND != Authority Authenticated
+          PROVENANCE_BOUND != Normative Correctness Verified
+
+          This prerelease does not claim production end-to-end enforcement, production runtime observation, freshness verification, authority authentication, normative correctness of organization/domain rules, certification, adoption, or production deployment.
+
+          External first-time Human onboarding acceptance remains PENDING under Issue #4.
+
+          Technical Prerelease != Production Ready
+
+          Verified final source:
+          16b7b0ae5ba0c7e8dcd7e728dd6808a43c5095e8
+
+          Verified distribution SHA-256:
+          - wheel: 38662971bb43314d0df795d84c34e9f03d60cc69ac5b165596cc4e393c5c8242
+          - sdist: 875b36fc4d5cfe90af49624d8236b383a9e1b7e85f30e30e541761095e2667be
+          EOF
+
+      - name: Repair release metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-notes.md
+
+      - name: Read back and compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > release.json
+          jq -e --arg sha "$FINAL_COMMIT" '.target_commitish == $sha and .prerelease == true' release.json
+          jq -r '.body' release.json > release-body.txt
+          python - <<'PY'
+          import json
+          expected = open("release-notes.md", encoding="utf-8").read().strip()
+          actual = json.load(open("release.json", encoding="utf-8"))["body"].strip()
+          assert actual == expected
+          print("release_notes_readback=PASS")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a3-release-notes-repair-evidence
+          path: |
+            release-notes.md
+            release.json
+          if-no-files-found: error
+          retention-days: 30
