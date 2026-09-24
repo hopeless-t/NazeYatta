@@ -33,7 +33,7 @@ NazeYatta:
 NazeYatta does **not** publish the photo.  
 NazeYatta does **not** grant permission to publish it.
 
-It only performs the preflight check and returns a reproducible result.
+It performs bounded preflight or post-action verification and returns a reproducible receipt. It still does not execute the action.
 
 ## Try it in 30 seconds
 
