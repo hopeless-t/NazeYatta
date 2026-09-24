@@ -1,0 +1,74 @@
+schema_version: "0.2"
+task_id: EXP-RELEASE-GITHUB-V02
+action:
+  operation: publish
+  side_effect: external_write
+  externality: public
+  target:
+    provider: github
+    repository: hopeless-t/NazeYatta
+    tag: v0.2.0a3
+    final_commit: 16b7b0ae5ba0c7e8dcd7e728dd6808a43c5095e8
+    prerelease: true
+worker:
+  required_capability: publish_github_release
+data:
+  classification: public
+  artifacts:
+    - filename: nazeyatta-0.2.0a3-py3-none-any.whl
+      sha256: 38662971bb43314d0df795d84c34e9f03d60cc69ac5b165596cc4e393c5c8242
+    - filename: nazeyatta-0.2.0a3.tar.gz
+      sha256: 875b36fc4d5cfe90af49624d8236b383a9e1b7e85f30e30e541761095e2667be
+  fixture_only: true
+semantics:
+  critical_meaning_complete: true
+evidence:
+  authority_verified: EV-AUTH
+  execution_target_verified: EV-TARGET
+  worker_capability_qualified: EV-CAP
+  provenance_verified: EV-PROV
+  publication_permission_verified: EV-PERM
+  evidence_bundle_current: EV-CURRENT
+evidence_records:
+  EV-AUTH:
+    evidence_id: EV-AUTH
+    supports_claim: authority_verified
+    observed_at: "2026-09-24T19:45:00+09:00"
+    observer: {type: synthetic_fixture}
+    artifact: {ref: human-publication-gate-placeholder}
+    verification: {state: UNKNOWN}
+  EV-TARGET:
+    evidence_id: EV-TARGET
+    supports_claim: execution_target_verified
+    observed_at: "2026-09-24T19:45:00+09:00"
+    observer: {type: synthetic_workflow_adapter}
+    artifact: {ref: github-repo-tag-commit-artifact-hash-tuple}
+    verification: {state: VERIFIED}
+  EV-CAP:
+    evidence_id: EV-CAP
+    supports_claim: worker_capability_qualified
+    observed_at: "2026-09-24T19:45:00+09:00"
+    observer: {type: synthetic_workflow_adapter}
+    artifact: {ref: github-actions-contents-write-capability}
+    verification: {state: VERIFIED}
+  EV-PROV:
+    evidence_id: EV-PROV
+    supports_claim: provenance_verified
+    observed_at: "2026-09-24T19:45:00+09:00"
+    observer: {type: synthetic_workflow_adapter}
+    artifact: {ref: exact-source-build-and-hash-verification}
+    verification: {state: VERIFIED}
+  EV-PERM:
+    evidence_id: EV-PERM
+    supports_claim: publication_permission_verified
+    observed_at: "2026-09-24T19:45:00+09:00"
+    observer: {type: synthetic_fixture}
+    artifact: {ref: human-publication-permission-placeholder}
+    verification: {state: UNKNOWN}
+  EV-CURRENT:
+    evidence_id: EV-CURRENT
+    supports_claim: evidence_bundle_current
+    observed_at: "2026-09-24T19:45:00+09:00"
+    observer: {type: synthetic_workflow_adapter}
+    artifact: {ref: pre-write-evidence-snapshot}
+    verification: {state: VERIFIED}
