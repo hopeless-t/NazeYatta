@@ -1,0 +1,227 @@
+name: Final Release Verify 0.2.0a3
+
+on:
+  push:
+    branches:
+      - release/0.2.0a3-final-verify-publication
+
+permissions:
+  contents: read
+
+env:
+  CANDIDATE: 16b7b0ae5ba0c7e8dcd7e728dd6808a43c5095e8
+
+jobs:
+  build:
+    name: Build exact 0.2.0a3 candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert verification-only branch delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$CANDIDATE" HEAD
+          CHANGED="$(git diff --name-only "$CANDIDATE"...HEAD)"
+          test "$CHANGED" = ".github/workflows/release-final-verify-0.2.0a3.yml" || {
+            echo "unexpected candidate delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Checkout exact source candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "$CANDIDATE"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build and test dependencies
+        run: |
+          python -m pip install --upgrade pip build
+          python -m pip install -e . pytest
+
+      - name: Run source suite
+        run: python -m pytest -q
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Record exact hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          (
+            cd dist
+            sha256sum * > ../release-evidence/SHA256SUMS.txt
+          )
+          {
+            echo "candidate=$CANDIDATE"
+            echo "version=0.2.0a3"
+            echo
+            echo "[dist]"
+            ls -l dist/
+            echo
+            echo "[sha256]"
+            cat release-evidence/SHA256SUMS.txt
+          } | tee release-evidence/build-receipt.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a3-final-main-verify-dist
+          path: |
+            dist/*
+            release-evidence/SHA256SUMS.txt
+            release-evidence/build-receipt.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-wheel:
+    name: Fresh installed wheel / Python ${{ matrix.python-version }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a3-verify-dist
+          path: candidate-artifact
+
+      - name: Fresh install exact built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .verify-venv
+          . .verify-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install candidate-artifact/dist/*.whl
+
+      - name: Verify installed package surfaces away from source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          mkdir -p /tmp/nazeyatta-a3-verify "$GITHUB_WORKSPACE/release-evidence/python-${{ matrix.python-version }}"
+          cd /tmp/nazeyatta-a3-verify
+
+          python - <<'PY' | tee "$GITHUB_WORKSPACE/release-evidence/python-${{ matrix.python-version }}/verification.txt"
+          import json
+          import subprocess
+          from importlib.metadata import version
+          import nazeyatta
+          from nazeyatta.evaluator import MAX_INPUT_BYTES
+
+          assert version("nazeyatta") == "0.2.0a3"
+          assert nazeyatta.__version__ == "0.2.0a3"
+
+          cli_version = subprocess.run(
+              ["nazeyatta", "--version"],
+              check=True, capture_output=True, text=True
+          ).stdout.strip()
+          assert cli_version == "nazeyatta 0.2.0a3"
+
+          safe = subprocess.run(
+              ["nazeyatta", "example", "safe-read"],
+              check=True, capture_output=True, text=True
+          ).stdout
+          p = subprocess.run(
+              ["nazeyatta", "check", "-"],
+              input=safe, capture_output=True, text=True
+          )
+          assert p.returncode == 0
+          assert "PASS" in p.stdout
+          assert "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" in p.stdout
+
+          pj = subprocess.run(
+              ["nazeyatta", "check", "-", "--json"],
+              input=safe, capture_output=True, text=True
+          )
+          assert pj.returncode == 0
+          receipt = json.loads(pj.stdout)
+          assert receipt["outcome"] == "PASS"
+          assert receipt["authority_granted"] is False
+          assert receipt["evaluator_version"] == "0.2.0a3"
+
+          blocked = subprocess.run(
+              ["nazeyatta", "example", "publish-photo"],
+              check=True, capture_output=True, text=True
+          ).stdout
+          b = subprocess.run(
+              ["nazeyatta", "check", "-"],
+              input=blocked, capture_output=True, text=True
+          )
+          assert b.returncode == 2
+          assert "BLOCK" in b.stdout
+          assert "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" in b.stdout
+
+          bad_utf8 = subprocess.run(
+              ["nazeyatta", "check", "-"],
+              input=b"\xff\xfe\x00", capture_output=True
+          )
+          assert bad_utf8.returncode == 3
+          assert b"INVALID INPUT" in bad_utf8.stderr
+          assert b"not valid UTF-8" in bad_utf8.stderr
+
+          oversized = subprocess.run(
+              ["nazeyatta", "check", "-"],
+              input=b"#" * (MAX_INPUT_BYTES + 1), capture_output=True
+          )
+          assert oversized.returncode == 3
+          assert b"INVALID INPUT" in oversized.stderr
+          assert b"input larger than" in oversized.stderr
+
+          policy_stdin = subprocess.run(
+              ["nazeyatta", "check", "-", "--policy", "-"],
+              input=safe, capture_output=True, text=True
+          )
+          assert policy_stdin.returncode == 3
+          assert "--policy - is not supported" in policy_stdin.stderr
+
+          expected_ids = {
+              "task": "urn:nazeyatta:schema:task:0.2",
+              "evidence": "urn:nazeyatta:schema:evidence:0.2",
+              "receipt": "urn:nazeyatta:schema:receipt:0.2",
+          }
+          for name, expected_id in expected_ids.items():
+              sp = subprocess.run(
+                  ["nazeyatta", "schema", name],
+                  check=True, capture_output=True, text=True
+              )
+              data = json.loads(sp.stdout)
+              assert data["$id"] == expected_id
+
+          print("package_version=0.2.0a3")
+          print("runtime_version=0.2.0a3")
+          print("cli_version=nazeyatta 0.2.0a3")
+          print("stdin_safe_read_exit=0")
+          print("stdin_publish_photo_exit=2")
+          print("stdin_json_receipt=PASS")
+          print("stdin_invalid_utf8_exit=3")
+          print("stdin_oversized_exit=3")
+          print("policy_stdin_rejected_exit=3")
+          print("packaged_schemas=task,evidence,receipt")
+          print("authority_granted=false")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a3-python-${{ matrix.python-version }}-evidence
+          path: release-evidence/python-${{ matrix.python-version }}/
+          if-no-files-found: error
+          retention-days: 7
