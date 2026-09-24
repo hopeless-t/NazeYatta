@@ -281,6 +281,29 @@ def _assert_observation_binds_handoff(
         )
 
 
+def validate_boundary_observation_for_handoff(
+    handoff: FreshHandoff,
+    observation: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate one serialized Boundary Observation against one exact FreshHandoff.
+
+    This is a read-only consumer-side validation step. It does not authenticate the
+    observer/source, make the handoff runtime-state-bound, or grant authority.
+    """
+    handoff_fingerprint = _validated_handoff_fingerprint(handoff)
+    checked = _validate_observation(
+        _mapping(observation, "observation"),
+        "observation",
+    )
+    _assert_observation_binds_handoff(
+        handoff,
+        checked,
+        where="",
+        expected_handoff_fingerprint=handoff_fingerprint,
+    )
+    return checked
+
+
 def build_boundary_observation(
     handoff: FreshHandoff,
     *,
@@ -318,14 +341,7 @@ def build_boundary_observation(
         "observed_at": observed_at,
     }
 
-    observation = _validate_observation(observation, "observation")
-    _assert_observation_binds_handoff(
-        handoff,
-        observation,
-        where="",
-        expected_handoff_fingerprint=handoff_fingerprint,
-    )
-    return observation
+    return validate_boundary_observation_for_handoff(handoff, observation)
 
 
 def evaluate_reky_gate(
