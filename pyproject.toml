@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nazeyatta"
 version = "1.1.0"
-description = "Command-line preflight checker for AI workers and automation"
+description = "Command-line preflight and post-action verification checker for AI workers and automation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
