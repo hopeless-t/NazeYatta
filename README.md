@@ -97,12 +97,12 @@ Examples:
 
 Requires Python 3.11+.
 
-Install the `0.2.0a3` technical prerelease from PyPI and extract a packaged example:
+Install the `0.2.0a4` technical prerelease from PyPI and extract a packaged example:
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a3"
+python -m pip install "nazeyatta==0.2.0a4"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
