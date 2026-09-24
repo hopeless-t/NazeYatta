@@ -1,5 +1,5 @@
 from dataclasses import asdict
-import hashlib
+import subprocess
 import json
 from pathlib import Path
 
@@ -22,9 +22,15 @@ RECORDED_SOURCE_TOKEN = "gitblob:4e142217c2517534f3c42090abfd75958701a701"
 
 
 def _source_token() -> str:
-    payload = POLICY_PATH.read_bytes()
-    header = f"blob {len(payload)}\\0".encode("ascii")
-    return "gitblob:" + hashlib.sha1(header + payload).hexdigest()
+    proc = subprocess.run(
+        ["git", "rev-parse", "HEAD:policies/generic/rules.yaml"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return "gitblob:" + proc.stdout.strip()
 
 
 def _record(**overrides):
