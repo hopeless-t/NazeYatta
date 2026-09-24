@@ -1,0 +1,172 @@
+name: Publish NazeYatta to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published GitHub Release version without the v prefix"
+        required: true
+        type: string
+      final_commit:
+        description: "Exact source commit targeted by the GitHub Release"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nazeyatta-release
+  cancel-in-progress: false
+
+jobs:
+  publish-pypi:
+    name: Human-gated exact GitHub Release assets to PyPI
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+      FINAL_COMMIT: ${{ inputs.final_commit }}
+      TAG: v${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Assert bounded source relationship
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${#FINAL_COMMIT}" -eq 40
+          case "$FINAL_COMMIT" in
+            *[!0-9a-f]*) echo "final_commit must be lowercase hex" >&2; exit 1 ;;
+          esac
+          git merge-base --is-ancestor "$FINAL_COMMIT" "$GITHUB_SHA"
+
+          SOURCE_VERSION="$(git show "$FINAL_COMMIT:pyproject.toml" | python -c 'import sys,tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])')"
+          test "$SOURCE_VERSION" = "$VERSION"
+          test "$TAG" = "v$SOURCE_VERSION"
+
+      - name: Verify exact GitHub Release identity and distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pypi-dist evidence
+
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > evidence/tag-ref.json
+          jq -e --arg sha "$FINAL_COMMIT" '.object.sha == $sha' evidence/tag-ref.json
+
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > evidence/release.json
+          jq -e --arg tag "$TAG" --arg sha "$FINAL_COMMIT" \
+            '.tag_name == $tag and .prerelease == true and .target_commitish == $sha' \
+            evidence/release.json
+
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir pypi-dist \
+            --pattern "nazeyatta-${VERSION}-py3-none-any.whl" \
+            --pattern "nazeyatta-${VERSION}.tar.gz"
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir evidence \
+            --pattern "SHA256SUMS.txt"
+
+          (
+            cd pypi-dist
+            sha256sum -c ../evidence/SHA256SUMS.txt
+          ) | tee evidence/github-release-sha256.txt
+
+          python -m pip install --upgrade pip twine
+          python -m twine check pypi-dist/*
+
+      - name: Observe PyPI target immediately before publish step
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP="$(curl -sS -o evidence/pypi-before.json -w '%{http_code}' \
+            "https://pypi.org/pypi/nazeyatta/$VERSION/json")"
+          test "$HTTP" = "404"
+          {
+            echo "pypi_target_state_before=absent"
+            echo "target_observed_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+            echo "target_observed_epoch_ns=$(date +%s%N)"
+            echo "publish_step_boundary_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          } > evidence/pypi-prewrite.txt
+
+      - name: Publish through environment-scoped PyPI Trusted Publisher
+        id: trusted_publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi-dist/
+          print-hash: true
+
+      - name: Wait for exact PyPI metadata and verify hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://pypi.org/pypi/nazeyatta/$VERSION/json"
+          FOUND=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$URL" -o evidence/pypi-after.json; then
+              WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
+              SDIST="nazeyatta-${VERSION}.tar.gz"
+              EXPECTED_WHEEL="$(awk -v f="$WHEEL" '$2 == f {print $1}' evidence/SHA256SUMS.txt)"
+              EXPECTED_SDIST="$(awk -v f="$SDIST" '$2 == f {print $1}' evidence/SHA256SUMS.txt)"
+              ACTUAL_WHEEL="$(jq -r --arg f "$WHEEL" '.urls[] | select(.filename == $f) | .digests.sha256' evidence/pypi-after.json)"
+              ACTUAL_SDIST="$(jq -r --arg f "$SDIST" '.urls[] | select(.filename == $f) | .digests.sha256' evidence/pypi-after.json)"
+              if [ "$ACTUAL_WHEEL" = "$EXPECTED_WHEEL" ] && [ "$ACTUAL_SDIST" = "$EXPECTED_SDIST" ]; then
+                FOUND=1
+                break
+              fi
+            fi
+            sleep 10
+          done
+          test "$FOUND" -eq 1
+
+          jq '{
+            info: {name: .info.name, version: .info.version, requires_python: .info.requires_python},
+            files: [.urls[] | {filename, packagetype, size, sha256: .digests.sha256, upload_time_iso_8601}]
+          }' evidence/pypi-after.json > evidence/pypi-summary.json
+
+      - name: Re-download PyPI files and verify exact SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pypi-redownload
+          WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
+          SDIST="nazeyatta-${VERSION}.tar.gz"
+          WHEEL_URL="$(jq -r --arg f "$WHEEL" '.urls[] | select(.filename == $f) | .url' evidence/pypi-after.json)"
+          SDIST_URL="$(jq -r --arg f "$SDIST" '.urls[] | select(.filename == $f) | .url' evidence/pypi-after.json)"
+          test -n "$WHEEL_URL"
+          test -n "$SDIST_URL"
+          curl -fL "$WHEEL_URL" -o "pypi-redownload/$WHEEL"
+          curl -fL "$SDIST_URL" -o "pypi-redownload/$SDIST"
+          (
+            cd pypi-redownload
+            sha256sum -c ../evidence/SHA256SUMS.txt
+          ) | tee evidence/pypi-redownload-sha256.txt
+
+          {
+            echo "trusted_publish_outcome=${{ steps.trusted_publish.outcome }}"
+            echo "authentication_route=GitHub_OIDC_Trusted_Publishing"
+            echo "environment=release"
+            echo "publication_performed=true"
+          } > evidence/publication-route.txt
+
+      - name: Upload PyPI publication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-${{ inputs.version }}-pypi-publication-evidence
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30

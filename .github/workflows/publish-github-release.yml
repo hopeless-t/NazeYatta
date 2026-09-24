@@ -1,0 +1,264 @@
+name: Publish GitHub Technical Prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v prefix (for example 0.2.0a4)"
+        required: true
+        type: string
+      final_commit:
+        description: "Exact 40-character source commit to publish"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nazeyatta-release
+  cancel-in-progress: false
+
+jobs:
+  build-verify:
+    name: Build and verify exact release candidate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      FINAL_COMMIT: ${{ inputs.final_commit }}
+      TAG: v${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Assert exact main source and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${#FINAL_COMMIT}" -eq 40
+          case "$FINAL_COMMIT" in
+            *[!0-9a-f]*) echo "final_commit must be lowercase hex" >&2; exit 1 ;;
+          esac
+          test "$GITHUB_SHA" = "$FINAL_COMMIT"
+          test "$(git rev-parse HEAD)" = "$FINAL_COMMIT"
+
+          SOURCE_VERSION="$(python - <<'PY'
+          import pathlib, tomllib
+          data = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
+          print(data["project"]["version"])
+          PY
+          )"
+          test "$SOURCE_VERSION" = "$VERSION"
+          test "$TAG" = "v$SOURCE_VERSION"
+
+      - name: Install build and test dependencies
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m pip install -e . pytest
+
+      - name: Run exact source suite
+        run: python -m pytest -q
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Verify distributions and record hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
+          SDIST="nazeyatta-${VERSION}.tar.gz"
+          test -f "dist/$WHEEL"
+          test -f "dist/$SDIST"
+          python -m twine check "dist/$WHEEL" "dist/$SDIST"
+          mkdir -p release-evidence
+          (
+            cd dist
+            sha256sum "$WHEEL" "$SDIST" > ../release-evidence/SHA256SUMS.txt
+          )
+          {
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "final_commit=$FINAL_COMMIT"
+            echo "build_verified_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+            echo "external_target_write_performed=false"
+            echo "publication_performed=false"
+          } > release-evidence/build-receipt.txt
+          {
+            echo "## NazeYatta release candidate"
+            echo
+            echo "- Version: $VERSION"
+            echo "- Final commit: $FINAL_COMMIT"
+            echo "- Environment approval required before GitHub Release write: release"
+            echo
+            echo "### SHA-256"
+            echo '```text'
+            cat release-evidence/SHA256SUMS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-${{ inputs.version }}-release-candidate
+          path: |
+            dist/
+            release-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-github:
+    name: Human-gated GitHub prerelease publication
+    needs: build-verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+      FINAL_COMMIT: ${{ inputs.final_commit }}
+      TAG: v${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.final_commit }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nazeyatta-${{ inputs.version }}-release-candidate
+          path: candidate
+
+      - name: Reverify exact candidate after Human gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$FINAL_COMMIT"
+          (
+            cd candidate/dist
+            sha256sum -c ../release-evidence/SHA256SUMS.txt
+          )
+
+      - name: Prepare bounded truthful release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
+          SDIST="nazeyatta-${VERSION}.tar.gz"
+          WHEEL_SHA="$(awk -v f="$WHEEL" '$2 == f {print $1}' candidate/release-evidence/SHA256SUMS.txt)"
+          SDIST_SHA="$(awk -v f="$SDIST" '$2 == f {print $1}' candidate/release-evidence/SHA256SUMS.txt)"
+          test -n "$WHEEL_SHA"
+          test -n "$SDIST_SHA"
+          cat > release-notes.md <<EOF
+          NazeYatta $VERSION is a technical alpha prerelease.
+
+          Verified final source:
+          $FINAL_COMMIT
+
+          Verified distribution SHA-256:
+          - wheel: $WHEEL_SHA
+          - sdist: $SDIST_SHA
+
+          Important boundaries:
+          PASS != Execution Authority
+          Technical Prerelease != Production Ready
+          Release Published != Production Adoption
+          Exact Artifact Correlation != Freshness
+
+          Publication of this release passed the configured GitHub Environment release gate.
+          EOF
+
+      - name: Observe live target and create GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p publication-evidence
+
+          TAG_HTTP="$(curl -sS -o publication-evidence/tag-before.json -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG")"
+          RELEASE_HTTP="$(curl -sS -o publication-evidence/release-before.json -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$TAG")"
+          test "$TAG_HTTP" = "404"
+          test "$RELEASE_HTTP" = "404"
+
+          OBSERVED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          OBSERVED_NS="$(date +%s%N)"
+          WRITE_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+          WRITE_STARTED_NS="$(date +%s%N)"
+
+          WHEEL="candidate/dist/nazeyatta-${VERSION}-py3-none-any.whl"
+          SDIST="candidate/dist/nazeyatta-${VERSION}.tar.gz"
+          SUMS="candidate/release-evidence/SHA256SUMS.txt"
+
+          gh release create "$TAG" \
+            "$WHEEL" \
+            "$SDIST" \
+            "$SUMS" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$FINAL_COMMIT" \
+            --title "NazeYatta $VERSION — Technical Alpha" \
+            --notes-file release-notes.md \
+            --prerelease
+
+          python - "$OBSERVED_NS" "$WRITE_STARTED_NS" <<'PY' > publication-evidence/observation-to-write.txt
+          import sys
+          observed_ns = int(sys.argv[1])
+          write_ns = int(sys.argv[2])
+          assert write_ns >= observed_ns
+          print(f"observation_to_write_seconds={(write_ns - observed_ns) / 1_000_000_000:.9f}")
+          PY
+          {
+            echo "target_observed_at=$OBSERVED_AT"
+            echo "write_started_at=$WRITE_STARTED_AT"
+            echo "tag_state_before=absent"
+            echo "release_state_before=absent"
+          } >> publication-evidence/observation-to-write.txt
+
+      - name: Independent GitHub publication readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloaded-release
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > publication-evidence/tag-ref.json
+          jq -e --arg sha "$FINAL_COMMIT" '.object.sha == $sha' publication-evidence/tag-ref.json
+
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > publication-evidence/release.json
+          jq -e --arg tag "$TAG" --arg sha "$FINAL_COMMIT" \
+            '.tag_name == $tag and .prerelease == true and .target_commitish == $sha' \
+            publication-evidence/release.json
+
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir downloaded-release
+          (
+            cd downloaded-release
+            sha256sum -c SHA256SUMS.txt
+          ) | tee publication-evidence/download-sha256.txt
+
+          jq '{
+            tag_name,
+            name,
+            prerelease,
+            published_at,
+            target_commitish,
+            html_url,
+            assets: [.assets[] | {name, size, digest}]
+          }' publication-evidence/release.json > publication-evidence/release-summary.json
+
+      - name: Upload GitHub publication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-${{ inputs.version }}-github-publication-evidence
+          path: publication-evidence/
+          if-no-files-found: error
+          retention-days: 30
