@@ -1,0 +1,287 @@
+name: Prewrite Release Observer 0.2.0a4
+
+on:
+  push:
+    branches:
+      - experiment/prewrite-release-observer-0.2.0a4
+
+permissions:
+  contents: read
+
+env:
+  FINAL_MAIN: 29e6ae1b081c991d2e4817e4cdedb37304140948
+  INTENDED_TAG: v0.2.0a4
+
+jobs:
+  observe:
+    name: Read-only intended release pre-write dry-run
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert workflow-only experiment branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$FINAL_MAIN" HEAD
+          CHANGED="$(git diff --name-only "$FINAL_MAIN"...HEAD)"
+          test "$CHANGED" = ".github/workflows/prewrite-release-observer-0.2.0a4.yml" || {
+            echo "unexpected experiment-branch delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Checkout exact canonical main source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "$FINAL_MAIN"
+          test "$(git rev-parse HEAD)" = "$FINAL_MAIN"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build current development snapshot only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip build
+          python -m pip install -e .
+          test "$(nazeyatta --version)" = "nazeyatta 0.2.0a4"
+          python -m build
+          mkdir -p evidence
+          (
+            cd dist
+            sha256sum * > ../evidence/CANDIDATE_SHA256SUMS.txt
+          )
+
+      - name: Observe intended target immediately before preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          date -u +'%Y-%m-%dT%H:%M:%S.%NZ' > evidence/pre-observed-at.txt
+
+          TAG_HTTP="$(curl -sS -o evidence/pre-tag.json -w '%{http_code}'             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/$INTENDED_TAG")"
+
+          RELEASE_HTTP="$(curl -sS -o evidence/pre-release.json -w '%{http_code}'             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$INTENDED_TAG")"
+
+          {
+            echo "tag_http=$TAG_HTTP"
+            echo "release_http=$RELEASE_HTTP"
+          } | tee evidence/pre-state.env
+
+          test "$TAG_HTTP" = "404"
+          test "$RELEASE_HTTP" = "404"
+
+      - name: Bind observed pre-state to candidate Task and evaluate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from copy import deepcopy
+          from dataclasses import asdict
+          from datetime import datetime
+          import json
+          import os
+          from pathlib import Path
+
+          from nazeyatta.evaluator import evaluate, load_yaml, stable_hash
+
+          root = Path.cwd()
+          evidence = root / "evidence"
+
+          wheel = next((root / "dist").glob("*.whl"))
+          sdist = next((root / "dist").glob("*.tar.gz"))
+
+          def sha256_from_sums(filename: str) -> str:
+              for line in (evidence / "CANDIDATE_SHA256SUMS.txt").read_text().splitlines():
+                  digest, name = line.split(maxsplit=1)
+                  if name == filename:
+                      return digest
+              raise RuntimeError(f"missing digest for {filename}")
+
+          artifacts = sorted(
+              [
+                  {"filename": wheel.name, "sha256": sha256_from_sums(wheel.name)},
+                  {"filename": sdist.name, "sha256": sha256_from_sums(sdist.name)},
+              ],
+              key=lambda item: item["filename"],
+          )
+
+          descriptor = {
+              "provider": "github",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "tag": os.environ["INTENDED_TAG"],
+              "final_commit": os.environ["FINAL_MAIN"],
+              "prerelease": True,
+              "artifacts": artifacts,
+          }
+          fingerprint = stable_hash(descriptor)
+
+          task = deepcopy(
+              load_yaml(root / "examples" / "release-github-publication-v02.synthetic.yaml")
+          )
+          task["task_id"] = "DRYRUN-PREWRITE-GITHUB-0.2.0a4"
+          task["action"]["target"] = {
+              "provider": "github",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "tag": os.environ["INTENDED_TAG"],
+              "final_commit": os.environ["FINAL_MAIN"],
+              "prerelease": True,
+          }
+          task["data"]["artifacts"] = artifacts
+          task["data"]["fixture_only"] = True
+          task["data"]["dry_run_only"] = True
+
+          observed_at = (evidence / "pre-observed-at.txt").read_text().strip()
+          datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+
+          states = {
+              "EV-AUTH": "UNKNOWN",
+              "EV-TARGET": "VERIFIED",
+              "EV-CAP": "UNKNOWN",
+              "EV-PROV": "VERIFIED",
+              "EV-PERM": "UNKNOWN",
+              "EV-CURRENT": "VERIFIED",
+          }
+          refs = {
+              "EV-AUTH": "human-release-authority-not-authenticated",
+              "EV-TARGET": f"live-prewrite-github-target:{fingerprint}",
+              "EV-CAP": "read-only-dry-run-has-no-publication-capability",
+              "EV-PROV": f"exact-main-build:{os.environ['FINAL_MAIN']}",
+              "EV-PERM": "publication-permission-not-established",
+              "EV-CURRENT": "same-run-preflight-observation",
+          }
+          for evidence_id, state in states.items():
+              rec = task["evidence_records"][evidence_id]
+              rec["observed_at"] = observed_at
+              rec["observer"] = {"type": "workflow_dry_run"}
+              rec["artifact"] = {"ref": refs[evidence_id]}
+              rec["verification"] = {"state": state}
+
+          policies = load_yaml(root / "policies" / "generic" / "rules.yaml")
+          receipt = evaluate(task, policies)
+
+          assert receipt.outcome == "BLOCK"
+          assert receipt.authority_granted is False
+          assert receipt.evidence_lane == "provenance-v0.2"
+
+          blocked = {
+              finding["evidence_key"]
+              for finding in receipt.findings
+              if finding["effect"] == "BLOCK"
+          }
+          assert "authority_verified" in blocked
+          assert "publication_permission_verified" in blocked
+
+          (evidence / "intended-target-descriptor.json").write_text(
+              json.dumps(descriptor, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (evidence / "target-fingerprint.txt").write_text(
+              fingerprint + "\n", encoding="utf-8"
+          )
+          (evidence / "dry-run-task.json").write_text(
+              json.dumps(task, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (evidence / "preflight-receipt.json").write_text(
+              json.dumps(asdict(receipt), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+          summary = {
+              "classification": "LIVE_PREWRITE_TARGET_STATE_OBSERVATION_DRY_RUN",
+              "source_commit": os.environ["FINAL_MAIN"],
+              "development_version": "0.2.0a4",
+              "intended_tag": os.environ["INTENDED_TAG"],
+              "target_fingerprint": fingerprint,
+              "pre_target_state": "ABSENT",
+              "preflight_outcome": receipt.outcome,
+              "blocked_claims": sorted(blocked),
+              "target_observation_verified": True,
+              "exact_build_provenance_verified": True,
+              "bounded_evidence_bundle_current": True,
+              "publication_capability_verified": False,
+              "publication_permission_verified": False,
+              "authority_authenticated": False,
+              "authority_granted": False,
+              "freshness_verified": False,
+              "external_target_write_performed": False,
+              "publication_performed": False,
+          }
+          (evidence / "observer-summary.json").write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Re-observe target after blocked preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +'%Y-%m-%dT%H:%M:%S.%NZ' > evidence/post-observed-at.txt
+
+          TAG_HTTP="$(curl -sS -o evidence/post-tag.json -w '%{http_code}'             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/git/ref/tags/$INTENDED_TAG")"
+
+          RELEASE_HTTP="$(curl -sS -o evidence/post-release.json -w '%{http_code}'             -H "Authorization: Bearer $GH_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$INTENDED_TAG")"
+
+          {
+            echo "tag_http=$TAG_HTTP"
+            echo "release_http=$RELEASE_HTTP"
+          } | tee evidence/post-state.env
+
+          test "$TAG_HTTP" = "404"
+          test "$RELEASE_HTTP" = "404"
+
+      - name: Finalize bounded observation summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from datetime import datetime
+          import json
+          from pathlib import Path
+
+          evidence = Path("evidence")
+          summary = json.loads((evidence / "observer-summary.json").read_text())
+
+          pre = datetime.fromisoformat(
+              (evidence / "pre-observed-at.txt").read_text().strip().replace("Z", "+00:00")
+          )
+          post = datetime.fromisoformat(
+              (evidence / "post-observed-at.txt").read_text().strip().replace("Z", "+00:00")
+          )
+          assert post >= pre
+
+          summary.update(
+              {
+                  "post_target_state": "ABSENT",
+                  "target_state_unchanged_during_dry_run": True,
+                  "observation_window_seconds": (post - pre).total_seconds(),
+                  "observation_to_write_interval_verified": False,
+                  "freshness_verified": False,
+              }
+          )
+          (evidence / "observer-summary.json").write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload dry-run observation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-prewrite-release-observer-0.2.0a4
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 30
