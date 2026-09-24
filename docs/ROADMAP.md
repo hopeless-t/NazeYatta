@@ -124,6 +124,61 @@ VerificationReceipt != Action Authority
 UNKNOWN != Permission To Retry
 ```
 
+## Post-1.1 operating state — evidence wait / maintenance
+
+NazeYatta `1.1.0` is now a published stable release.
+
+Observed publication evidence:
+
+```text
+GitHub Release workflow  36044631117  SUCCESS
+PyPI workflow            36044846412  SUCCESS
+
+release tag              v1.1.0
+release target           73254d8280665fd785f744fc380eb64cab489961
+
+live public-wheel verification
+  outcome                VERIFIED_SUCCESS
+  authority_granted      false
+  retry_authorized       false
+```
+
+The repository has also aligned the public first-time README with the 1.1
+`check -> external action -> verify` loop and added a durable first-time Human
+feedback Issue Form.
+
+Current product-development state:
+
+```text
+Stable 1.1 release                      = PUBLISHED
+Live self-dogfood                       = VERIFIED_SUCCESS
+First-time Human test surface           = READY
+First-time Human response               = NOT YET OBSERVED
+External onboarding acceptance (#4)     = PENDING / UNKNOWN
+Normative correctness model (#28)       = HOLD / NO CONCRETE DOMAIN MODEL
+Generic next feature                    = NOT AUTHORIZED BY EVIDENCE
+```
+
+The next implementation tranche should begin only when at least one concrete
+trigger exists, for example:
+
+1. a real first-time Human response exposes a specific onboarding failure;
+2. a concrete integration request supplies a real runtime operation, target,
+   evidence source, and enforcement placement;
+3. a concrete real-domain consumer supplies a bounded verification model for
+   the remaining #28 normative-correctness question;
+4. an observed defect or regression in the stable 1.1 contract requires a fix.
+
+Until then, maintenance and evidence collection are preferred to speculative
+feature growth.
+
+```text
+Published != Adopted
+Feedback Intake Ready != Human Feedback Received
+Deferred Research != Build Queue
+No New Evidence -> No New Framework
+```
+
 ## Integration-bound HOLD items
 
 Do not add generic framework code for these without a concrete consumer.
