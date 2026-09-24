@@ -36,4 +36,4 @@ where = ["src"]
 pythonpath = ["src"]
 
 [tool.setuptools.package-data]
-nazeyatta = ["data/*.yaml"]
+nazeyatta = ["data/*.yaml", "schemas/*.json"]
