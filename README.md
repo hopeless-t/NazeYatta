@@ -97,15 +97,21 @@ Examples:
 
 Requires Python 3.11+.
 
+Install the `0.2.0a2` technical prerelease from PyPI and extract a packaged example:
+
 ~~~bash
-git clone https://github.com/hopeless-t/NazeYatta.git
-cd NazeYatta
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install -e .
+python -m pip install "nazeyatta==0.2.0a2"
 
-nazeyatta check examples/publish-photo.yaml
+nazeyatta --version
+nazeyatta example publish-photo > task.yaml
+nazeyatta check task.yaml
 ~~~
+
+The `example` command only copies a fixed bundled YAML example to stdout. It does **not** evaluate the task or grant execution authority.
+
+For source development or contribution work, clone the repository instead; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The example says that publication permission is UNKNOWN.
 
@@ -134,7 +140,8 @@ Plain language:
 Try a simple read-only example too:
 
 ~~~bash
-nazeyatta check examples/safe-read.yaml
+nazeyatta example safe-read > safe-read.yaml
+nazeyatta check safe-read.yaml
 ~~~
 
 That example returns PASS.
@@ -210,7 +217,7 @@ Only PASS returns CLI exit status 0.
 The result can also be emitted as JSON:
 
 ~~~bash
-nazeyatta check examples/safe-read.yaml --json
+nazeyatta check safe-read.yaml --json
 ~~~
 
 The receipt includes fingerprints and evaluation information so another tool or Human can inspect what was evaluated.
