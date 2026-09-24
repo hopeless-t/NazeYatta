@@ -2,7 +2,7 @@
 
 This repository uses two separate external publication boundaries:
 
-1. GitHub technical prerelease publication.
+1. GitHub release publication (`stable` or `prerelease` channel).
 2. PyPI package publication.
 
 Both write boundaries are protected by the GitHub Actions Environment named `release`.
@@ -10,7 +10,7 @@ Both write boundaries are protected by the GitHub Actions Environment named `rel
 ## Operator sequence
 
 1. Prepare and review an exact release candidate on `main`.
-2. Dispatch `Publish GitHub Technical Prerelease` from `main` with the version and exact final commit.
+2. Dispatch `Publish GitHub Release` from `main` with the version, exact final commit, and intended `stable` / `prerelease` channel.
 3. Inspect the build/verification result and hashes.
 4. Approve the `release` Environment deployment only when GitHub publication is intended.
 5. Confirm GitHub Release readback succeeds.
@@ -32,7 +32,7 @@ Build PASS != Runtime/Production Readiness
 Exact Artifact Correlation != Freshness
 ```
 
-The workflows record a live target observation immediately before each external-write step and perform post-write readback. A future real publication can therefore provide evidence for the observation-to-write relation tracked in Issue #54. Merely having this instrumentation in source does not establish freshness.
+The workflows record a live target observation immediately before each external-write step and perform post-write readback. The v0.2.0a4 GitHub/PyPI publication exercised this path and supplied the bounded real-write evidence that completed Issue #54. That concrete result does not imply universal freshness for unrelated consumers.
 
 ## Safety properties
 
@@ -44,3 +44,5 @@ The workflows record a live target observation immediately before each external-
 - The PyPI workflow filename remains `publish-pypi-0.2.0a1.yml` because that filename is part of the configured Trusted Publisher identity.
 
 Release workflow configured != release authorized.
+
+Stable release channel != production enforcement claim.
