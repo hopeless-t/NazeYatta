@@ -1,8 +1,27 @@
 # Changelog
 
-## Unreleased — 0.2.0a4 development line
+## Unreleased — 0.2.0a4 release candidate
 
 No `0.2.0a4` release has been published yet.
+
+Candidate delta since `0.2.0a3`:
+
+- add synthetic first-party GitHub Release and PyPI publication consumers that keep Human authority and publication permission explicit rather than inferring them from a PASS;
+- bind the exact release Task target descriptor through the consumer projection into the runtime target observation, and reject target-defining Task drift without promoting generic semantic-equivalence or freshness claims;
+- persist separate GitHub Release and PyPI publication workflows on canonical main, both manual-only and protected by the GitHub Actions `release` Environment;
+- keep GitHub Release and PyPI as two distinct irreversible external-write boundaries with separate Human approvals, pre-write target observation, and post-write readback;
+- preserve the existing PyPI Trusted Publisher workflow filename while constraining authentication to the `release` Environment;
+- add release-workflow contract tests that fail if automatic publication triggers, the Environment gate, or least-privilege write/OIDC boundaries drift.
+
+Important boundaries remain:
+
+```text
+PASS != Execution Authority
+Environment Approval != Universal Authority Authentication
+Exact Artifact Correlation != Freshness
+Release Workflow Configured != Release Authorized
+Technical Prerelease != Production Ready
+```
 
 ## 0.2.0a3 — 2026-09-24 — technical prerelease
 
