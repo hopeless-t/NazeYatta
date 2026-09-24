@@ -340,7 +340,7 @@ def _v02_effective_state(
     return state, None
 
 
-def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: str = "0.2.0a2") -> Receipt:
+def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: str = "0.2.0a3") -> Receipt:
     lane = _validate_task_contract(task)
     evidence = task["evidence"]
     evidence_records = task.get("evidence_records")
