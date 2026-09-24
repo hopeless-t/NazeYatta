@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:preflight-runtime-correlation:0.1",
+  "title": "NazeYatta Preflight / Runtime Correlation Record",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "classification",
+    "task_id",
+    "receipt_fingerprint",
+    "task_fingerprint",
+    "policy_bundle_fingerprint",
+    "handoff_fingerprint",
+    "boundary_observation_fingerprint",
+    "target_binding",
+    "observed_at",
+    "correlation_outcome",
+    "semantic_equivalence_verified",
+    "freshness_verified",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "classification": {
+      "const": "PREFLIGHT_RUNTIME_CORRELATION"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "receipt_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_bundle_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "handoff_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "boundary_observation_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_binding": {
+      "type": "object",
+      "required": [
+        "kind",
+        "identifier",
+        "identity_fingerprint"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_fingerprint": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlation_outcome": {
+      "const": "EXACT_ARTIFACTS_BOUND"
+    },
+    "semantic_equivalence_verified": {
+      "const": false
+    },
+    "freshness_verified": {
+      "const": false
+    },
+    "authority_granted": {
+      "const": false
+    }
+  },
+  "additionalProperties": false
+}
