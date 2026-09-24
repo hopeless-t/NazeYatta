@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .evaluator import EVIDENCE_LANES, evaluate, load_yaml
+from .evaluator import EVIDENCE_LANES, MAX_INPUT_BYTES, evaluate, load_yaml, load_yaml_text
 from .receipt_io import write_receipt_json
 
 EMOJI = {
@@ -68,6 +68,25 @@ def safe_text(value: object, limit: int = MAX_FIELD_CHARS) -> str:
     return text if len(text) <= limit else text[:limit] + "…[truncated]"
 
 
+def _load_task_input(path: str):
+    if path != "-":
+        return load_yaml(path)
+
+    stream = getattr(sys.stdin, "buffer", None)
+    if stream is None:
+        text = sys.stdin.read(MAX_INPUT_BYTES + 1)
+        return load_yaml_text(text, "<stdin>")
+
+    raw = stream.read(MAX_INPUT_BYTES + 1)
+    if len(raw) > MAX_INPUT_BYTES:
+        raise ValueError(f"<stdin>: input larger than {MAX_INPUT_BYTES} bytes")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("<stdin>: input is not valid UTF-8") from exc
+    return load_yaml_text(text, "<stdin>")
+
+
 def print_receipt(receipt) -> None:
     print("NAZEYATTA")
     print("👈😽 PRE-FLIGHT KY")
@@ -92,7 +111,9 @@ def print_receipt(receipt) -> None:
 
 def cmd_check(args: argparse.Namespace) -> int:
     try:
-        task = load_yaml(args.task)
+        if args.policy == "-":
+            raise ValueError("--policy - is not supported; only the Task positional argument may read stdin")
+        task = _load_task_input(args.task)
         policies = load_yaml(args.policy)
         receipt = evaluate(task, policies)
     except (ValueError, OSError) as exc:
@@ -172,8 +193,8 @@ def main() -> int:
     sub = p.add_subparsers(dest="command", required=True)
 
     c = sub.add_parser("check", help="run deterministic preflight KY")
-    c.add_argument("task")
-    c.add_argument("--policy", default=str(default_policy_path()))
+    c.add_argument("task", help="Task YAML path, or '-' to read one UTF-8 Task from stdin")
+    c.add_argument("--policy", default=str(default_policy_path()), help="policy YAML path; stdin is not supported")
     c.add_argument("--json", action="store_true")
     c.add_argument(
         "--receipt-out",

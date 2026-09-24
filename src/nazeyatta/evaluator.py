@@ -84,16 +84,23 @@ def _check_shape(data: Any, path: str) -> None:
             raise ValueError(f"{path}: NaN/Infinity values are not allowed")
 
 
+def load_yaml_text(text: str, source: str = "<input>") -> dict[str, Any]:
+    if len(text.encode("utf-8")) > MAX_INPUT_BYTES:
+        raise ValueError(f"{source}: input larger than {MAX_INPUT_BYTES} bytes")
+    data = yaml.safe_load(text)
+    if not isinstance(data, dict):
+        raise ValueError(f"expected mapping in {source}")
+    _check_shape(data, source)
+    return data
+
+
 def load_yaml(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     if p.is_file() and p.stat().st_size > MAX_INPUT_BYTES:
         raise ValueError(f"{path}: file larger than {MAX_INPUT_BYTES} bytes")
     with open(p, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    if not isinstance(data, dict):
-        raise ValueError(f"expected mapping in {path}")
-    _check_shape(data, str(path))
-    return data
+        text = f.read()
+    return load_yaml_text(text, str(path))
 
 
 def _json_default(value: Any) -> str:
