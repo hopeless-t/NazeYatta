@@ -40,7 +40,7 @@ Requires Python 3.11+.
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a4"
+python -m pip install "nazeyatta==1.0.0"
 
 nazeyatta example publish-photo > task.yaml
 nazeyatta check task.yaml
@@ -118,12 +118,12 @@ Examples:
 
 Requires Python 3.11+.
 
-Install the `0.2.0a4` technical prerelease from PyPI and extract a packaged example:
+Install the stable `1.0.0` release from PyPI and extract a packaged example:
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a4"
+python -m pip install "nazeyatta==1.0.0"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
@@ -276,7 +276,7 @@ NazeYatta is not:
 - proof that the supplied evidence source was truthful or authorized;
 - automatic end-to-end enforcement.
 
-The current alpha evaluates supplied task/evidence structure and policy conditions deterministically.
+The stable CLI core evaluates supplied task/evidence structure and policy conditions deterministically.
 
 For high-impact actions, use a separate enforcement point the worker cannot bypass.
 
@@ -327,9 +327,9 @@ Read them when you need the deeper model:
 
 ## Current status
 
-NazeYatta is an **alpha research tool**.
+NazeYatta `1.0` is a **stable command-line preflight checker** with a deliberately bounded support contract.
 
-Implemented preflight foundation:
+Supported stable CLI foundation (see [Stable Core 1.0](docs/STABLE_CORE_1_0.md)):
 
 - deterministic YAML preflight evaluation;
 - bundled generic baseline rules;
@@ -341,7 +341,7 @@ Implemented preflight foundation:
 - structured violation-debrief templates;
 - tests and examples.
 
-Bounded experimental contracts now also exist for:
+The repository also contains bounded experimental/library contracts for:
 
 - typed Worker KY declarations and a deterministic KY validation gate;
 - a single-bounce Fresh Handoff and Boundary Observation / Re-KY comparison;
