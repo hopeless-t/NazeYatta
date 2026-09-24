@@ -19,9 +19,9 @@ NazeYatta separates normative rules, observations, authority, and presentation.
 - Preflight PASS != Authority Granted
 - Preflight PASS != Eternal PASS
 
-## v0.1-alpha input ownership contract
+## 1.0 input ownership contract
 
-NazeYatta v0.1-alpha evaluates a supplied task manifest. It does not create the task YAML and it does not infer missing authority from the identity of whoever wrote the file.
+NazeYatta 1.0 evaluates a supplied task manifest. It does not create the task YAML and it does not infer missing authority from the identity of whoever wrote the file.
 
 The bounded ownership contract is:
 
@@ -29,8 +29,8 @@ The bounded ownership contract is:
 - evidence assertions are supplied by a Human, trusted Adapter, or workflow-appropriate Evidence Source;
 - the acting Worker must not manufacture its own `VERIFIED` facts merely because it wants to perform the action;
 - NazeYatta evaluates supplied structure, claim linkage, evidence state, and policy effect;
-- NazeYatta v0.1-alpha does not independently authenticate the real-world producer of those facts;
-- NazeYatta v0.1-alpha does not independently prove that an evidence source has authority to assert a state;
+- NazeYatta 1.0 does not independently authenticate the real-world producer of those facts;
+- NazeYatta 1.0 does not independently prove that an evidence source has authority to assert a state;
 - NazeYatta never grants execution authority from a preflight `PASS` alone.
 
 ```text
@@ -52,7 +52,7 @@ NazeYatta
 
 The v0.2 provenance input lane improves structural traceability by binding a policy claim to an Evidence Record. Structural provenance is not itself proof of trust or authority.
 
-Future mechanisms such as per-observer state ceilings, source allow-lists, authority records, runtime adapters, stronger task-semantics provenance, receipt freshness/target-state binding, or cryptographic producer authentication are separate research or implementation decisions. They do not change this v0.1-alpha ownership contract merely by being proposed.
+Future mechanisms such as per-observer state ceilings, source allow-lists, authority records, runtime adapters, stronger task-semantics provenance, receipt freshness/target-state binding, or cryptographic producer authentication are separate research or implementation decisions. They do not change this 1.0 ownership contract merely by being proposed.
 
 ## Observation states
 
