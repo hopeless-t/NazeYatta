@@ -20,7 +20,7 @@ body:
     attributes:
       label: NazeYatta version
       description: Paste `nazeyatta --version` if available.
-      placeholder: "nazeyatta 0.2.0a2"
+      placeholder: "nazeyatta 0.2.0a4"
     validations:
       required: true
 
