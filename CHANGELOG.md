@@ -1,10 +1,26 @@
 # Changelog
 
-## Unreleased
+## Unreleased — 0.2.0a1 development line
 
-No release after `0.1.0a2` has been published yet.
+No `0.2.0a1` release has been published yet.
 
-## 0.1.0a2 — release candidate (unpublished)
+Current main includes the bounded post-`0.1.0a2` contract tranche:
+
+- deterministic no-clobber receipt JSON files;
+- fail-closed runtime Task structural validation;
+- dependency-free schema/runtime parity guards for shared invariants;
+- FreshHandoff, reusable Boundary Observation construction, and Re-KY integration;
+- exact preflight/runtime artifact correlation with semantic-equivalence and freshness claims explicitly false;
+- BaselineDerivationRecord, bounded DerivationSpec, and scoped SpecAdoptionRecord;
+- policy provenance with source/scope/lifecycle binding while authority authentication and normative correctness remain explicitly unverified;
+- roadmap convergence at the integration boundary: freshness, authority authentication, real-domain semantic correctness, and violation runtime remain HOLD until concrete consumers/evidence exist.
+
+```text
+0.2.0a1 In Source != 0.2.0a1 Released
+Core Converged != Production Ready
+```
+
+## 0.1.0a2 — 2026-09-24 — technical prerelease
 
 - reorder the English and Japanese README so first-time users see what NazeYatta is, when to use it, one copy-paste example, result meaning, first-task YAML, field ownership, and the post-preflight flow before the deeper research material
 - document the bounded v0.1-alpha input-ownership contract: task/action/data semantics come from an upstream Human / Planner / Task Specification / trusted Adapter; evidence comes from a Human / trusted Adapter / workflow-appropriate Evidence Source; Worker self-declaration is not evidence
