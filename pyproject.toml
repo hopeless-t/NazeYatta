@@ -16,8 +16,15 @@ classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Software Development :: Quality Assurance",
 ]
+
+[project.urls]
+Homepage = "https://github.com/hopeless-t/NazeYatta"
+Repository = "https://github.com/hopeless-t/NazeYatta"
+Issues = "https://github.com/hopeless-t/NazeYatta/issues"
+Changelog = "https://github.com/hopeless-t/NazeYatta/blob/main/CHANGELOG.md"
 
 [project.scripts]
 nazeyatta = "nazeyatta.cli:main"
