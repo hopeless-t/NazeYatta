@@ -14,7 +14,7 @@
 
 - implemented alpha input lane: claim-to-Evidence-Record references with conservative effective-state resolution
 - runtime structural Task Contract hardening + dependency-free schema/runtime parity guard (full JSON Schema enforcement remains separate)
-- explicit policy provenance metadata
+- explicit policy provenance record with source/scope/lifecycle binding (implemented; authority authentication remains external)
 - reusable receipt JSON files via deterministic no-clobber `--receipt-out` artifacts
 - reusable Boundary Observation construction + exact preflight/runtime correlation record (implemented prerequisites); receipt freshness / target-state binding remains next-stage work
 - runtime gate adapter interface
