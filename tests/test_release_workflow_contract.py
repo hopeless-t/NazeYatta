@@ -39,6 +39,10 @@ def test_github_release_write_is_human_gated_and_manual_only():
     assert "gh release create" in publish_text
     assert "target_observed_at=" in publish_text
     assert "write_started_at=" in publish_text
+    assert (
+        "External first-time Human onboarding acceptance remains PENDING under Issue #4."
+        in publish_text
+    )
 
 
 def test_pypi_write_is_human_gated_manual_and_oidc_scoped():
