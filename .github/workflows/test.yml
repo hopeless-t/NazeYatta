@@ -56,7 +56,64 @@ jobs:
           . .wheel-smoke/bin/activate
           nazeyatta example safe-read | nazeyatta check -
           nazeyatta schema task >/dev/null
+          nazeyatta schema verification-request >/dev/null
+          nazeyatta schema post-action-observation >/dev/null
+          nazeyatta schema verification-receipt >/dev/null
           nazeyatta debrief-template NY-AUTH-001 >/dev/null
+
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          from nazeyatta.evaluator import stable_hash
+
+          def fp(label):
+              return stable_hash({"label": label})
+
+          request = {
+              "schema_version": "0.1",
+              "classification": "POST_ACTION_VERIFICATION_REQUEST",
+              "verification_id": "WHEEL-SMOKE",
+              "task_id": "WHEEL-SMOKE-TASK",
+              "preflight_receipt_fingerprint": fp("preflight"),
+              "task_fingerprint": fp("task"),
+              "action_fingerprint": fp("action"),
+              "target_binding": {
+                  "kind": "smoke-target",
+                  "identifier": "wheel",
+                  "identity_fingerprint": fp("target"),
+              },
+              "expected_facts": {"installed_cli_works": True},
+              "authority_granted": False,
+          }
+          observation = {
+              "schema_version": "0.1",
+              "classification": "POST_ACTION_OBSERVATION",
+              "observation_id": "WHEEL-SMOKE-OBS",
+              "verification_id": request["verification_id"],
+              "task_id": request["task_id"],
+              "preflight_receipt_fingerprint": request["preflight_receipt_fingerprint"],
+              "task_fingerprint": request["task_fingerprint"],
+              "action_fingerprint": request["action_fingerprint"],
+              "target_binding": request["target_binding"],
+              "observed_facts": {
+                  "installed_cli_works": {
+                      "observation_state": "OBSERVED",
+                      "value": True,
+                  }
+              },
+              "observed_by": {"type": "workflow", "identifier": "wheel-smoke"},
+              "observed_at": "2026-09-25T00:00:00+09:00",
+              "authority_granted": False,
+          }
+          Path("/tmp/verify-request.yaml").write_text(
+              yaml.safe_dump(request, sort_keys=False), encoding="utf-8"
+          )
+          Path("/tmp/verify-observation.yaml").write_text(
+              yaml.safe_dump(observation, sort_keys=False), encoding="utf-8"
+          )
+          PY
+
+          nazeyatta verify /tmp/verify-request.yaml /tmp/verify-observation.yaml | grep VERIFIED_SUCCESS
 
 
   dogfood-safe-read:
