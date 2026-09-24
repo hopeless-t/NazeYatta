@@ -7,6 +7,7 @@ No `0.2.0a3` release has been published yet.
 - allow one bounded UTF-8 Task YAML to be read from stdin with `nazeyatta check -`, while preserving the same 1 MiB input ceiling, structural validation, evaluation semantics, and exit codes as file input;
 - reject `--policy -` explicitly so a single stdin stream cannot ambiguously supply both Task and policy documents;
 - verify packaged-example-to-stdin pipelines, JSON receipt output, oversized stdin, and invalid UTF-8 fail-closed behavior.
+- package exact copies of the existing core Task, Evidence Record, and Receipt JSON Schemas and expose them with `nazeyatta schema task|evidence|receipt` without adding new schema semantics.
 
 ## 0.2.0a2 — 2026-09-24 — technical prerelease
 
