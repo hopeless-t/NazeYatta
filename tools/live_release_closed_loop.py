@@ -226,6 +226,7 @@ def build_verification_request(
         },
         "expected_facts": {
             "github_release_exists": True,
+            "github_release_tag": target["source_release_tag"],
             "github_release_prerelease": release_channel == "prerelease",
             "github_release_target_commit": target["source_release_commit"],
             "pypi_public_version": version,
@@ -262,6 +263,7 @@ def build_observation(
 
     observed_facts = {
         "github_release_exists": _observed(bool(release_payload)),
+        "github_release_tag": _observed(release_payload.get("tag_name")),
         "github_release_prerelease": _observed(release_payload.get("prerelease")),
         "github_release_target_commit": _observed(release_payload.get("target_commitish")),
         "pypi_public_version": _observed(pypi_info.get("version")),
