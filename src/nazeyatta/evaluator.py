@@ -223,6 +223,66 @@ def _effect_map(rule_id: Any, req: dict[str, Any]) -> dict[str, Any]:
     return effect_map
 
 
+TASK_SIDE_EFFECTS = {"none", "write", "external_write", "destructive"}
+TASK_EXTERNALITIES = {"internal", "public"}
+
+
+def _required_task_string(value: Any, where: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{where} must be a non-empty string")
+    return value
+
+
+def _validate_task_contract(task: dict[str, Any]) -> str:
+    """Validate the safety-critical task shape before policy selectors can run.
+
+    This intentionally covers only the runtime-critical structural subset. It does not
+    replace JSON Schema, authenticate producers, or change Evidence state semantics.
+    """
+    if not isinstance(task, dict):
+        raise ValueError("task must be a mapping")
+
+    _required_task_string(task.get("task_id"), "task_id")
+
+    action = task.get("action")
+    if not isinstance(action, dict):
+        raise ValueError("action must be a mapping")
+    _required_task_string(action.get("operation"), "action.operation")
+
+    side_effect = action.get("side_effect")
+    if side_effect not in TASK_SIDE_EFFECTS:
+        raise ValueError(
+            f"action.side_effect must be one of {sorted(TASK_SIDE_EFFECTS)!r}"
+        )
+
+    externality = action.get("externality")
+    if externality not in TASK_EXTERNALITIES:
+        raise ValueError(
+            f"action.externality must be one of {sorted(TASK_EXTERNALITIES)!r}"
+        )
+
+    semantics = task.get("semantics")
+    if not isinstance(semantics, dict):
+        raise ValueError("semantics must be a mapping")
+    if not isinstance(semantics.get("critical_meaning_complete"), bool):
+        raise ValueError("semantics.critical_meaning_complete must be a boolean")
+
+    evidence = task.get("evidence")
+    if not isinstance(evidence, dict):
+        raise ValueError("evidence must be a mapping")
+
+    for optional_mapping in ("worker", "data"):
+        if optional_mapping in task and not isinstance(task[optional_mapping], dict):
+            raise ValueError(f"{optional_mapping} must be a mapping")
+
+    lane = _evidence_lane(task)
+    if lane == "provenance-v0.2" and not isinstance(task.get("evidence_records"), dict):
+        raise ValueError(
+            "evidence_records must be a mapping in schema_version 0.2"
+        )
+    return lane
+
+
 def _evidence_lane(task: dict[str, Any]) -> str:
     """Select a supported input lane without silently downgrading explicit versions."""
     if task.get("schema_version") == "0.2":
@@ -281,11 +341,8 @@ def _v02_effective_state(
 
 
 def evaluate(task: dict[str, Any], policies: dict[str, Any], evaluator_version: str = "0.1.0a2") -> Receipt:
-    evidence = task.get("evidence", {})
-    if not isinstance(evidence, dict):
-        raise ValueError("task.evidence must be a mapping")
-
-    lane = _evidence_lane(task)
+    lane = _validate_task_contract(task)
+    evidence = task["evidence"]
     evidence_records = task.get("evidence_records")
     rules = policies.get("rules", [])
     if not isinstance(rules, list):
