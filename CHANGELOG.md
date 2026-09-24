@@ -1,8 +1,6 @@
 # Changelog
 
-## Unreleased — 0.2.0a1 development line
-
-No `0.2.0a1` release has been published yet.
+## 0.2.0a1 — 2026-09-24 — technical prerelease
 
 Current main includes the bounded post-`0.1.0a2` contract tranche:
 
