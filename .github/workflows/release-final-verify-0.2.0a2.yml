@@ -1,0 +1,209 @@
+name: Final Release Verify 0.2.0a2
+
+on:
+  push:
+    branches:
+      - release/0.2.0a2-final-verify
+
+permissions:
+  contents: read
+
+env:
+  CANDIDATE: b05c8330291c891d21f52090d28d304dc2f2d120
+
+jobs:
+  build:
+    name: Build exact current candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Assert exact candidate plus verification-only delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$CANDIDATE" HEAD
+          CHANGED="$(git diff --name-only "$CANDIDATE"...HEAD)"
+          test "$CHANGED" = ".github/workflows/release-final-verify-0.2.0a2.yml" || {
+            echo "unexpected candidate delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Install build and source-test dependencies
+        run: |
+          python -m pip install --upgrade pip build
+          python -m pip install -e . pytest
+
+      - name: Run source suite
+        run: python -m pytest -q
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Record candidate hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          {
+            echo "candidate=$CANDIDATE"
+            echo "verification_commit=$(git rev-parse HEAD)"
+            echo "version=0.2.0a2"
+            echo
+            echo "[dist]"
+            ls -l dist/
+            echo
+            echo "[sha256]"
+            sha256sum dist/*
+          } | tee release-evidence/build-receipt.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a2-final-verify-dist
+          path: |
+            dist/*
+            release-evidence/build-receipt.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-wheel:
+    name: Final installed wheel / Python ${{ matrix.python-version }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a2-final-verify-dist
+          path: candidate-artifact
+
+      - name: Fresh install exact wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .verify-venv
+          . .verify-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install candidate-artifact/dist/*.whl
+
+      - name: Verify version surfaces and wheel metadata away from source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          mkdir -p /tmp/nazeyatta-020a2-final
+          cd /tmp/nazeyatta-020a2-final
+
+          test "$(nazeyatta --version)" = "nazeyatta 0.2.0a2"
+
+          python - <<'PY'
+          from importlib.metadata import metadata, version
+          import nazeyatta
+          from nazeyatta.cli import default_policy_path
+          from nazeyatta.evaluator import evaluate, load_yaml
+
+          assert version("nazeyatta") == "0.2.0a2"
+          assert nazeyatta.__version__ == "0.2.0a2"
+
+          task = {
+              "task_id": "VERIFY-VERSION",
+              "action": {"operation": "read", "side_effect": "none", "externality": "internal"},
+              "semantics": {"critical_meaning_complete": True},
+              "evidence": {},
+          }
+          receipt = evaluate(task, load_yaml(default_policy_path()))
+          assert receipt.evaluator_version == "0.2.0a2"
+          assert receipt.authority_granted is False
+
+          md = metadata("nazeyatta")
+          project_urls = set(md.get_all("Project-URL") or [])
+          expected_urls = {
+              "Homepage, https://github.com/hopeless-t/NazeYatta",
+              "Repository, https://github.com/hopeless-t/NazeYatta",
+              "Issues, https://github.com/hopeless-t/NazeYatta/issues",
+              "Changelog, https://github.com/hopeless-t/NazeYatta/blob/main/CHANGELOG.md",
+          }
+          assert expected_urls.issubset(project_urls)
+          assert "Programming Language :: Python :: 3.12" in set(md.get_all("Classifier") or [])
+
+          print("package_version=0.2.0a2")
+          print("runtime_version=0.2.0a2")
+          print("receipt_version=0.2.0a2")
+          print("cli_version=nazeyatta 0.2.0a2")
+          print("project_urls=PASS")
+          print("python_312_classifier=PASS")
+          PY
+
+      - name: Verify packaged examples retain BLOCK/PASS semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          cd /tmp/nazeyatta-020a2-final
+
+          nazeyatta example publish-photo > publish-photo.yaml
+          set +e
+          nazeyatta check publish-photo.yaml > publish-photo-result.txt 2>&1
+          BLOCK_EXIT=$?
+          set -e
+          test "$BLOCK_EXIT" -eq 2
+          grep -q "BLOCK" publish-photo-result.txt
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" publish-photo-result.txt
+
+          nazeyatta example safe-read > safe-read.yaml
+          nazeyatta check safe-read.yaml > safe-read-result.txt 2>&1
+          PASS_EXIT=$?
+          test "$PASS_EXIT" -eq 0
+          grep -q "PASS" safe-read-result.txt
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" safe-read-result.txt
+
+          echo "publish_photo_exit=$BLOCK_EXIT"
+          echo "safe_read_exit=$PASS_EXIT"
+
+      - name: Capture final readiness evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          DEST="$GITHUB_WORKSPACE/release-evidence/python-${{ matrix.python-version }}"
+          mkdir -p "$DEST"
+          cd /tmp/nazeyatta-020a2-final
+          cp publish-photo.yaml publish-photo-result.txt safe-read.yaml safe-read-result.txt "$DEST/"
+          {
+            echo "candidate=$CANDIDATE"
+            echo "python=$(python --version 2>&1)"
+            echo "package_version=$(python -c 'from importlib.metadata import version; print(version("nazeyatta"))')"
+            echo "cli_version=$(nazeyatta --version)"
+            echo "packaged_examples=true"
+            echo "publish_photo_exit=2"
+            echo "safe_read_exit=0"
+            echo "project_urls=true"
+            echo "python_312_classifier=true"
+          } > "$DEST/summary.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a2-final-python-${{ matrix.python-version }}-evidence
+          path: release-evidence/python-${{ matrix.python-version }}/
+          if-no-files-found: error
+          retention-days: 7
