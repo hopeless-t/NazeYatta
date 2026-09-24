@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from .evaluator import EVIDENCE_LANES, evaluate, load_yaml
+from .receipt_io import write_receipt_json
 
 EMOJI = {
     "PASS": "✅😺",
@@ -95,6 +96,15 @@ def cmd_check(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return EXIT_NOT_PASS
+    if args.receipt_out:
+        try:
+            write_receipt_json(receipt, args.receipt_out)
+        except OSError as exc:
+            print(
+                f"NAZEYATTA\n🚫😾 RECEIPT WRITE FAILED\n\n{type(exc).__name__}: {safe_text(exc)}",
+                file=sys.stderr,
+            )
+            return EXIT_INVALID_INPUT
     if args.json:
         print(json.dumps(receipt.__dict__, ensure_ascii=False, indent=2))
     else:
@@ -137,6 +147,12 @@ def main() -> int:
     c.add_argument("task")
     c.add_argument("--policy", default=str(default_policy_path()))
     c.add_argument("--json", action="store_true")
+    c.add_argument(
+        "--receipt-out",
+        default=None,
+        metavar="PATH",
+        help="write the evaluated Receipt as deterministic UTF-8 JSON; refuses to overwrite PATH",
+    )
     c.add_argument(
         "--require-lane",
         choices=EVIDENCE_LANES,
