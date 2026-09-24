@@ -18,10 +18,13 @@ POLICY_REF = "policy://nazeyatta/generic-v0.1"
 SOURCE_REF = "repo://policies/generic/rules.yaml"
 SCOPE_REF = "scope://nazeyatta/research-default"
 AUTHORITY_REF = "authority://nazeyatta/project-policy-maintainers"
+RECORDED_SOURCE_TOKEN = "gitblob:4e142217c2517534f3c42090abfd75958701a701"
 
 
 def _source_token() -> str:
-    return "sha256:" + hashlib.sha256(POLICY_PATH.read_bytes()).hexdigest()
+    payload = POLICY_PATH.read_bytes()
+    header = f"blob {len(payload)}\\0".encode("ascii")
+    return "gitblob:" + hashlib.sha1(header + payload).hexdigest()
 
 
 def _record(**overrides):
@@ -34,7 +37,7 @@ def _record(**overrides):
         "policy_ref": POLICY_REF,
         "policy_bundle_fingerprint": stable_hash(policies),
         "source_ref": SOURCE_REF,
-        "source_binding_token": _source_token(),
+        "source_binding_token": RECORDED_SOURCE_TOKEN,
         "claimed_authority_ref": AUTHORITY_REF,
         "scope_ref": SCOPE_REF,
         "status": "ACTIVE",
@@ -71,7 +74,8 @@ def test_actual_generic_policy_provenance_binds_without_authority_claim():
 
     assert result.policy_bundle_id == "nazeyatta-generic-v0.1"
     assert result.policy_bundle_fingerprint == stable_hash(policies)
-    assert result.source_binding_token == _source_token()
+    assert _source_token() == RECORDED_SOURCE_TOKEN
+    assert result.source_binding_token == RECORDED_SOURCE_TOKEN
     assert result.claimed_authority_ref == AUTHORITY_REF
     assert result.outcome == "PROVENANCE_BOUND"
     assert result.findings == []
