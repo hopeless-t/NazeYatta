@@ -44,7 +44,7 @@ Python 3.11以上が必要です。
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a4"
+python -m pip install "nazeyatta==1.0.0"
 
 nazeyatta example publish-photo > task.yaml
 nazeyatta check task.yaml
@@ -108,7 +108,7 @@ NazeYatta自身は、実際の作業を行ったり、実行権限を発行し�
 
 NazeYattaの役割は、**渡されたルールと、今回の作業について確認できている情報を照らし合わせること**です。
 
-現在のalpha版は、
+stable CLI core版は、
 
 > **「この人・組織が本当にそのルールを決める権限を持っているか」まで自動で証明するものではありません。**
 
@@ -155,12 +155,12 @@ NazeYattaが役立つのは、複数のAIや自動化処理で、次のような
 
 Python 3.11以上が必要です。
 
-PyPIから `0.2.0a4` technical prerelease を入れ、同梱Exampleを取り出します。
+PyPIからstable版 `1.0.0` を入れ、同梱Exampleを取り出します。
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a4"
+python -m pip install "nazeyatta==1.0.0"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
