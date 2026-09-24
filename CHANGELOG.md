@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.0 — 2026-09-25 — stable release
+
+NazeYatta 1.0 promotes the bounded command-line preflight core to the stable supported surface.
+
+- freeze the 1.x stable CLI contract for `check`, `example`, `schema`, and `--version`;
+- support bounded YAML file/stdin input with fail-closed structural validation and conservative exit codes;
+- support human-readable and JSON receipts, deterministic task/policy fingerprints, and no-clobber receipt files;
+- support the provenance-v0.2 Evidence Record lane while retaining legacy-v0.1 as a compatibility lane;
+- define Python 3.11 / 3.12 and PyPI packaging as the supported 1.0 package surface;
+- separate bounded KY / FreshHandoff / Re-KY / derivation research contracts from the stable CLI guarantee;
+- document that first-time Human onboarding evidence (#4) and generic normative-correctness research (#28) are useful but non-blocking for the bounded 1.0 core;
+- add a stable/prerelease GitHub release channel while preserving manual dispatch, the Human `release` Environment gate, exact source binding, pre-write target observation, artifact hashes, and post-write readback;
+- update public English/Japanese documentation and package metadata from alpha-prerelease wording to the bounded stable-core claim.
+
+Important boundaries remain:
+
+```text
+Stable CLI Core != Production Enforcement Platform
+Stable Package != Authority System
+PASS != Execution Authority
+Bundled Baseline != Universal Policy Authority
+```
+
 ## 0.2.0a4 — 2026-09-25 — technical prerelease
 
 Changes since `0.2.0a3`:
