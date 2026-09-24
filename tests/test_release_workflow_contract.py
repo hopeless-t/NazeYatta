@@ -63,6 +63,13 @@ def test_pypi_write_is_human_gated_manual_and_oidc_scoped():
     assert document["permissions"]["contents"] == "read"
     assert document["concurrency"]["group"] == "nazeyatta-release"
 
+    dispatch = document["on"]["workflow_dispatch"]
+    release_channel = dispatch["inputs"]["release_channel"]
+    assert release_channel["required"] == "true"
+    assert release_channel["type"] == "choice"
+    assert release_channel["default"] == "prerelease"
+    assert release_channel["options"] == ["prerelease", "stable"]
+
     publish = document["jobs"]["publish-pypi"]
     assert publish["environment"] == "release"
     assert publish["permissions"]["contents"] == "read"
@@ -78,4 +85,7 @@ def test_pypi_write_is_human_gated_manual_and_oidc_scoped():
     )
     assert "pypi_target_state_before=absent" in text
     assert "target_observed_at=" in text
+    assert "RELEASE_CHANNEL" in text
+    assert "EXPECTED_PRERELEASE" in text
+    assert "release_channel=$RELEASE_CHANNEL" in text
     assert "publication_performed=true" in text
