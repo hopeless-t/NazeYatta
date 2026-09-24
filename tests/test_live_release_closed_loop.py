@@ -72,6 +72,7 @@ def test_live_release_request_binds_actual_preflight_receipt(tmp_path):
     assert request["task_fingerprint"] == receipt.task_fingerprint
     assert request["action_fingerprint"] == stable_hash(task["action"])
     assert request["target_binding"]["identity_fingerprint"] == stable_hash(task["action"]["target"])
+    assert request["expected_facts"]["github_release_tag"] == f"v{VERSION}"
     assert request["authority_granted"] is False
 
 
@@ -82,6 +83,7 @@ def test_live_public_observation_can_succeed_and_preserves_mismatch(tmp_path):
         preflight_receipt=receipt.__dict__,
     )
     release = {
+        "tag_name": f"v{VERSION}",
         "prerelease": True,
         "target_commitish": FINAL_COMMIT,
     }
