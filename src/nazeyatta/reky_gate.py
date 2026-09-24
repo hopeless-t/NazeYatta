@@ -213,11 +213,7 @@ def _validate_observation(value: dict[str, Any], where: str) -> dict[str, Any]:
     return value
 
 
-def evaluate_reky_gate(
-    handoff: FreshHandoff,
-    before: dict[str, Any],
-    after: dict[str, Any],
-) -> ReKYDecision:
+def _validated_handoff_fingerprint(handoff: FreshHandoff) -> str:
     if not isinstance(handoff, FreshHandoff):
         raise ObservationGateError("handoff must be a FreshHandoff")
     if handoff.classification != "KY_VALIDATED_HANDOFF":
@@ -228,8 +224,116 @@ def evaluate_reky_gate(
         raise ObservationGateError("handoff must not grant execution authority")
     if handoff.validity != {"mode": "single_bounce", "runtime_state_bound": False}:
         raise ObservationGateError("handoff validity contract is unsupported")
+    return stable_hash(asdict(handoff))
 
-    expected_handoff_fingerprint = stable_hash(asdict(handoff))
+
+def _assert_observation_binds_handoff(
+    handoff: FreshHandoff,
+    observation: dict[str, Any],
+    *,
+    where: str,
+    expected_handoff_fingerprint: str,
+) -> None:
+    subject = f"{where} observation" if where else "observation"
+
+    if observation["task_id"] != handoff.task_id:
+        raise ObservationGateError(
+            f"{subject} task_id does not bind to handoff"
+        )
+    if observation["handoff_fingerprint"] != expected_handoff_fingerprint:
+        raise ObservationGateError(
+            f"{subject} handoff_fingerprint does not bind to handoff"
+        )
+
+    target = _target_binding(
+        observation["target_binding"], f"{where}.target_binding" if where else "target_binding"
+    )
+    if target[1] != handoff.intended_action["target"]:
+        raise ObservationGateError(
+            f"{subject} target does not bind to handoff intended target"
+        )
+
+    authority = _source_binding(
+        observation["authority_binding"],
+        f"{where}.authority_binding" if where else "authority_binding",
+    )
+    if authority[0] != handoff.source_refs["authority_ref"]:
+        raise ObservationGateError(
+            f"{subject} authority ref does not bind to handoff"
+        )
+
+    policy = _source_binding(
+        observation["policy_binding"],
+        f"{where}.policy_binding" if where else "policy_binding",
+    )
+    if policy[0] != handoff.source_refs["policy_ref"]:
+        raise ObservationGateError(
+            f"{subject} policy ref does not bind to handoff"
+        )
+
+    evidence = _evidence_bindings(
+        observation["evidence_bindings"],
+        f"{where}.evidence_bindings" if where else "evidence_bindings",
+    )
+    if set(evidence) != set(handoff.source_refs["evidence_refs"]):
+        raise ObservationGateError(
+            f"{subject} evidence refs do not bind to handoff"
+        )
+
+
+def build_boundary_observation(
+    handoff: FreshHandoff,
+    *,
+    observation_id: str,
+    target_binding: dict[str, Any],
+    source_snapshot: dict[str, Any],
+    observed_by: dict[str, Any],
+    observed_at: str,
+) -> dict[str, Any]:
+    """Build one handoff-bound Boundary Observation.
+
+    This helper binds structure and references to the exact FreshHandoff. It does
+    not authenticate the observer/source, grant authority, or make the handoff
+    runtime-state-bound.
+    """
+    handoff_fingerprint = _validated_handoff_fingerprint(handoff)
+    snapshot = _mapping(source_snapshot, "source_snapshot")
+    _exact_keys(
+        snapshot,
+        {"authority_binding", "policy_binding", "evidence_bindings"},
+        "source_snapshot",
+    )
+
+    observation = {
+        "schema_version": "0.2",
+        "observation_id": observation_id,
+        "classification": "BOUNDARY_OBSERVATION",
+        "task_id": handoff.task_id,
+        "handoff_fingerprint": handoff_fingerprint,
+        "target_binding": target_binding,
+        "authority_binding": snapshot["authority_binding"],
+        "policy_binding": snapshot["policy_binding"],
+        "evidence_bindings": snapshot["evidence_bindings"],
+        "observed_by": observed_by,
+        "observed_at": observed_at,
+    }
+
+    observation = _validate_observation(observation, "observation")
+    _assert_observation_binds_handoff(
+        handoff,
+        observation,
+        where="",
+        expected_handoff_fingerprint=handoff_fingerprint,
+    )
+    return observation
+
+
+def evaluate_reky_gate(
+    handoff: FreshHandoff,
+    before: dict[str, Any],
+    after: dict[str, Any],
+) -> ReKYDecision:
+    expected_handoff_fingerprint = _validated_handoff_fingerprint(handoff)
 
     before = _validate_observation(_mapping(before, "before"), "before")
     after = _validate_observation(_mapping(after, "after"), "after")
@@ -241,46 +345,12 @@ def evaluate_reky_gate(
             "after observation must not predate before observation"
         )
 
-    if before["task_id"] != handoff.task_id:
-        raise ObservationGateError(
-            "before observation task_id does not bind to handoff"
-        )
-    if before["handoff_fingerprint"] != expected_handoff_fingerprint:
-        raise ObservationGateError(
-            "before observation handoff_fingerprint does not bind to handoff"
-        )
-
-    before_target = _target_binding(
-        before["target_binding"], "before.target_binding"
+    _assert_observation_binds_handoff(
+        handoff,
+        before,
+        where="before",
+        expected_handoff_fingerprint=expected_handoff_fingerprint,
     )
-    if before_target[1] != handoff.intended_action["target"]:
-        raise ObservationGateError(
-            "before observation target does not bind to handoff intended target"
-        )
-
-    before_authority = _source_binding(
-        before["authority_binding"], "before.authority_binding"
-    )
-    if before_authority[0] != handoff.source_refs["authority_ref"]:
-        raise ObservationGateError(
-            "before observation authority ref does not bind to handoff"
-        )
-
-    before_policy = _source_binding(
-        before["policy_binding"], "before.policy_binding"
-    )
-    if before_policy[0] != handoff.source_refs["policy_ref"]:
-        raise ObservationGateError(
-            "before observation policy ref does not bind to handoff"
-        )
-
-    before_evidence_for_binding = _evidence_bindings(
-        before["evidence_bindings"], "before.evidence_bindings"
-    )
-    if set(before_evidence_for_binding) != set(handoff.source_refs["evidence_refs"]):
-        raise ObservationGateError(
-            "before observation evidence refs do not bind to handoff"
-        )
 
     if before["task_id"] != after["task_id"]:
         raise ObservationGateError("before/after task_id mismatch")

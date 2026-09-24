@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import shutil
 
-from nazeyatta.evaluator import load_yaml, stable_hash
+from nazeyatta.evaluator import load_yaml
 from nazeyatta.fresh_handoff import compile_fresh_handoff
 from nazeyatta.ky_gate import evaluate_ky_gate
-from nazeyatta.reky_gate import evaluate_reky_gate
+from nazeyatta.reky_gate import build_boundary_observation, evaluate_reky_gate
 from nazeyatta.runtime_fixture_sources import observe_fixture_sources
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,24 +49,21 @@ def boundary_observation(
     observed_at: datetime,
     source_snapshot: dict,
 ):
-    return {
-        "schema_version": "0.2",
-        "observation_id": observation_id,
-        "classification": "BOUNDARY_OBSERVATION",
-        "task_id": handoff.task_id,
-        "handoff_fingerprint": stable_hash(asdict(handoff)),
-        "target_binding": {
+    return build_boundary_observation(
+        handoff,
+        observation_id=observation_id,
+        target_binding={
             "kind": "file",
             "identifier": handoff.intended_action["target"],
             "identity_fingerprint": "sha256:stable-target-identity",
         },
-        **source_snapshot,
-        "observed_by": {
+        source_snapshot=source_snapshot,
+        observed_by={
             "type": "workflow",
             "identifier": "fixture-source-change-test",
         },
-        "observed_at": observed_at.isoformat(),
-    }
+        observed_at=observed_at.isoformat(),
+    )
 
 
 def test_policy_fixture_change_between_observations_requires_reky(tmp_path):
