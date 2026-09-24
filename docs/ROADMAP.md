@@ -53,7 +53,7 @@ Canonical contract:
 
 The stable 1.x surface includes:
 
-- `nazeyatta check`, `example`, `schema`, and `--version`;
+- `nazeyatta check`, `example`, `schema`, `debrief-template`, and `--version`;
 - bounded file/stdin Task input;
 - fail-closed structural/input handling;
 - deterministic policy evaluation;
