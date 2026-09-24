@@ -110,12 +110,14 @@ def test_pypi_release_runs_exact_artifact_closed_loop_self_dogfood():
     preflight = by_name[pre_name]["run"]
     postflight = by_name[post_name]["run"]
 
+    assert 'git show "$FINAL_COMMIT:tools/live_release_closed_loop.py"' in preflight
     assert '.release-preflight/bin/python -m pip install "pypi-dist/$WHEEL"' in preflight
     assert ".release-preflight/bin/nazeyatta check" in preflight
     assert "--require-lane provenance-v0.2" in preflight
     assert "live-preflight-receipt.json" in preflight
     assert "live-verification-request.json" in preflight
 
+    assert 'git show "$FINAL_COMMIT:tools/live_release_closed_loop.py"' in postflight
     assert '.public-verify/bin/python -m pip install "pypi-redownload/$WHEEL"' in postflight
     assert ".public-verify/bin/nazeyatta verify" in postflight
     assert "live-post-action-observation.json" in postflight
