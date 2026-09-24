@@ -1,0 +1,90 @@
+name: PyPI Environment Auth Smoke
+
+on:
+  push:
+    branches:
+      - experiment/pypi-environment-auth-smoke
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pypi-auth-smoke:
+    name: Verify release-scoped PyPI Trusted Publisher authentication
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - name: Request and inspect GitHub OIDC token
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OIDC_JSON="$(curl -fsSL \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=pypi")"
+          OIDC_TOKEN="$(jq -r '.value' <<<"$OIDC_JSON")"
+          test -n "$OIDC_TOKEN"
+          test "$OIDC_TOKEN" != "null"
+          echo "::add-mask::$OIDC_TOKEN"
+          export OIDC_TOKEN
+
+          python - <<'PY'
+          import base64
+          import json
+          import os
+
+          token = os.environ["OIDC_TOKEN"]
+          parts = token.split(".")
+          assert len(parts) == 3
+          payload = parts[1] + "=" * (-len(parts[1]) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+
+          assert claims["aud"] == "pypi"
+          assert claims["repository"] == "hopeless-t/NazeYatta"
+          assert claims["repository_id"] == "1346136060"
+          assert claims["repository_owner"] == "hopeless-t"
+          assert claims["repository_owner_id"] == "274503048"
+          assert ":environment:release" in claims["sub"]
+          assert ".github/workflows/publish-pypi-0.2.0a1.yml@" in claims["workflow_ref"]
+
+          print("oidc_audience=pypi")
+          print(f"oidc_subject={claims['sub']}")
+          print(f"oidc_repository={claims['repository']}")
+          print(f"oidc_repository_id={claims['repository_id']}")
+          print(f"oidc_repository_owner={claims['repository_owner']}")
+          print(f"oidc_repository_owner_id={claims['repository_owner_id']}")
+          print(f"oidc_workflow_ref={claims['workflow_ref']}")
+          print("oidc_environment_release=PASS")
+          PY
+
+          echo "OIDC_TOKEN=$OIDC_TOKEN" >> "$GITHUB_ENV"
+
+      - name: Exchange OIDC token with PyPI Trusted Publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PYPI_RESPONSE="$(
+            jq -cn --arg token "$OIDC_TOKEN" '{token:$token}' |
+              curl -fsS \
+                -X POST \
+                -H 'Content-Type: application/json' \
+                --data-binary @- \
+                https://pypi.org/_/oidc/mint-token
+          )"
+
+          jq -e '.token | type == "string" and length > 0' \
+            <<<"$PYPI_RESPONSE" >/dev/null
+
+          PYPI_TOKEN="$(jq -r '.token' <<<"$PYPI_RESPONSE")"
+          echo "::add-mask::$PYPI_TOKEN"
+
+          echo "pypi_trusted_publisher_exchange=accepted"
+          echo "pypi_token_persisted=false"
+          echo "package_upload_performed=false"
+          echo "publication_performed=false"
+
+          unset PYPI_TOKEN
+          unset PYPI_RESPONSE
