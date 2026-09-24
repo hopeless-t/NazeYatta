@@ -1,7 +1,7 @@
 # External First-Time Review Guide
 
 Status: CURRENT FACILITATOR GUIDE  
-Target public surface: NazeYatta `0.2.0a4` README / README.ja.md  
+Target public surface: NazeYatta `1.0.0` README / README.ja.md  
 Purpose: collect first-time Human onboarding evidence for Issue #4.
 
 > Do **not** send this guide to the tester before collecting their answers.
@@ -36,7 +36,7 @@ Then, if practical, ask the tester to try the public 30-second path:
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a4"
+python -m pip install "nazeyatta==1.0.0"
 
 nazeyatta example publish-photo > task.yaml
 nazeyatta check task.yaml
