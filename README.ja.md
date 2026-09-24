@@ -617,6 +617,9 @@ NazeYatta自身が本番のIAM・PKI・万能な権限管理システムにな�
 - [Roadmap](docs/ROADMAP.md)  
   **今できること、これから研究・実装したいこと、あえて後回しにしていること**
 
+- [Closed-loop Verification 1.1 開発中](docs/CLOSED_LOOP_VERIFICATION.ja.md)  
+  **「言ってたのと違う」を作業後のexact観測で検証する開発中機能。公開済みPyPI 1.0.0にはまだ含まれません。**
+
 - [Violation Debrief](docs/VIOLATION_DEBRIEF.md)  
   **実際にルール違反が起きた後、「なぜやった？」を記録して振り返るための形式**
 
