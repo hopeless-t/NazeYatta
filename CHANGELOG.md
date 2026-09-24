@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 1.1 development
+## 1.1.0 — 2026-09-25 — stable release
 
 - add the Human-approved Closed-loop Verification Kernel v0.1 scope;
 - add neutral `VerificationRequest`, `PostActionObservation`, and `VerificationReceipt` contracts;
@@ -10,7 +10,8 @@
 - add `nazeyatta verify REQUEST OBSERVATION` with JSON and no-clobber receipt output;
 - keep machine contracts neutral while projecting verification failures playfully in the human CLI;
 - add captured NazeYatta v1.0.0 release facts as the first concrete verification dogfood;
-- add V01-V20 coverage and built-wheel verification smoke.
+- add V01-V20 coverage and built-wheel verification smoke;
+- wire the Human-gated GitHub/PyPI release path for live self-dogfood: real preflight Receipt before publication, public readback, and verification by the exact re-downloaded PyPI wheel, while keeping publication and retry authority external.
 
 ```text
 Cute Presentation != Weakened Semantics
