@@ -1,0 +1,27 @@
+name: Release Environment Gate Smoke
+
+on:
+  push:
+    branches:
+      - experiment/release-environment-smoke
+
+permissions:
+  contents: read
+
+jobs:
+  release-environment-smoke:
+    name: Observe release Environment gate
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Record harmless gate passage
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "environment=release"
+          echo "repository=$GITHUB_REPOSITORY"
+          echo "ref=$GITHUB_REF"
+          echo "sha=$GITHUB_SHA"
+          echo "actor=$GITHUB_ACTOR"
+          echo "external_target_write_performed=false"
+          echo "publication_performed=false"
