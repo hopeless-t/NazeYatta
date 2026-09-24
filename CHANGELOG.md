@@ -7,6 +7,8 @@ No `0.2.0a2` release has been published yet.
 - add packaged first-run task examples addressable as `nazeyatta example publish-photo` and `nazeyatta example safe-read`;
 - keep example extraction separate from evaluation: the command prints fixed YAML only, while `nazeyatta check` retains its existing PASS/non-PASS exit semantics;
 - bind packaged example bytes to the repository examples in tests so source and installed-package onboarding inputs cannot silently drift.
+- add top-level `nazeyatta --version` aligned with package/runtime version metadata;
+- add PyPI navigation metadata for Homepage, Repository, Issues, and Changelog, plus the continuously-tested Python 3.12 classifier.
 
 ## 0.2.0a1 — 2026-09-24 — technical prerelease
 
