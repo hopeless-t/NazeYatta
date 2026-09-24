@@ -1,8 +1,6 @@
 # Changelog
 
-## Unreleased — 0.2.0a2 development line
-
-No `0.2.0a2` release has been published yet.
+## 0.2.0a2 — 2026-09-24 — technical prerelease
 
 - add packaged first-run task examples addressable as `nazeyatta example publish-photo` and `nazeyatta example safe-read`;
 - keep example extraction separate from evaluation: the command prints fixed YAML only, while `nazeyatta check` retains its existing PASS/non-PASS exit semantics;
