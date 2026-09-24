@@ -371,7 +371,7 @@ def verify_post_action(
             )
             continue
 
-        if item["value"] != expected:
+        if type(item["value"]) is not type(expected) or item["value"] != expected:
             contradiction = True
             reasons.append(
                 VerificationReason(
