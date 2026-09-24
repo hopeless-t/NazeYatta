@@ -76,7 +76,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: nazeyatta-0.2.0a3-final-main-verify-dist
+          name: nazeyatta-0.2.0a3-verify-dist
           path: |
             dist/*
             release-evidence/SHA256SUMS.txt
