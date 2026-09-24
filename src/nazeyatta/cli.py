@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from .evaluator import EVIDENCE_LANES, evaluate, load_yaml
+from .receipt_io import write_receipt_json
 
 EMOJI = {
     "PASS": "✅😺",
