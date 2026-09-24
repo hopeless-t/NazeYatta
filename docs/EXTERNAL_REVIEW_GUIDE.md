@@ -36,7 +36,7 @@ Then, if practical, ask the tester to try the public 30-second path:
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==1.0.0"
+python -m pip install "nazeyatta==1.1.0"
 
 nazeyatta example publish-photo > task.yaml
 nazeyatta check task.yaml

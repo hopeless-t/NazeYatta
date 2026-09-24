@@ -2,11 +2,13 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-**NazeYattaは、AIや自動化プログラムが何らかの作業を始める前に使う、機械が読める「作業前チェックリスト」です。コマンドラインから使います。**
+**NazeYattaは、AIや自動化プログラムの作業前チェックと、作業後のexactな事実確認を行う小さなコマンドラインツールです。**
 
-基本の問いは一つです。
+扱う問いは2つに限定しています。
 
 > **この作業を始めるために必要な確認は、本当にそろっているか？**
+>
+> **外部の作業主体が動いた後、観測された結果は事前に期待した事実とexactに一致したか？**
 
 確認できていないことを、NazeYattaは「たぶん大丈夫」に変えません。
 
@@ -35,7 +37,7 @@ NazeYattaは、**渡された作業内容と確認情報を、決められたル
 写真そのものを公開するわけではありません。  
 「公開してよい」という権限をNazeYatta自身が与えるわけでもありません。
 
-**作業前のチェックを行い、その結果を記録して返す道具**です。
+**作業前のチェック、または作業後のexactな検証を行い、その結果を記録して返す道具**です。
 
 ## 30秒で試す
 
@@ -44,7 +46,7 @@ Python 3.11以上が必要です。
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==1.0.0"
+python -m pip install "nazeyatta==1.1.0"
 
 nazeyatta example publish-photo > task.yaml
 nazeyatta check task.yaml
@@ -160,7 +162,7 @@ PyPIからstable版 `1.0.0` を入れ、同梱Exampleを取り出します。
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==1.0.0"
+python -m pip install "nazeyatta==1.1.0"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
@@ -617,8 +619,8 @@ NazeYatta自身が本番のIAM・PKI・万能な権限管理システムにな�
 - [Roadmap](docs/ROADMAP.md)  
   **今できること、これから研究・実装したいこと、あえて後回しにしていること**
 
-- [Closed-loop Verification 1.1 開発中](docs/CLOSED_LOOP_VERIFICATION.ja.md)  
-  **「言ってたのと違う」を作業後のexact観測で検証する開発中機能。公開済みPyPI 1.0.0にはまだ含まれません。**
+- [Closed-loop Verification 1.1](docs/CLOSED_LOOP_VERIFICATION.ja.md)  
+  **「言ってたのと違う」を作業後のexact観測で検証する1.1のstable機能。**
 
 - [Violation Debrief](docs/VIOLATION_DEBRIEF.md)  
   **実際にルール違反が起きた後、「なぜやった？」を記録して振り返るための形式**
@@ -630,7 +632,7 @@ NazeYatta自身が本番のIAM・PKI・万能な権限管理システムにな�
 
 ## 現在の状態
 
-NazeYatta `1.0` は、対応範囲を明示した **stableなコマンドラインpreflight checker** です。
+NazeYatta `1.1` は、対応範囲を明示した **stableなコマンドラインpreflight / post-action verification checker** です。
 
 ### 現在できること
 
@@ -642,6 +644,7 @@ NazeYatta `1.0` は、対応範囲を明示した **stableなコマンドライ�
 - 作業内容やルール一式に識別用のfingerprint（ハッシュ値）を付ける
 - 確認情報の出所を記録できる、実験的なv0.2形式を扱う
 - ルール違反が起きた後の振り返り用テンプレートを出す
+- 作業後のexactな観測結果を `VERIFIED_SUCCESS / VERIFIED_FAILURE / UNKNOWN` として検証する
 - 型付きのWorker KY申告を、独立したValidationBaselineと決定論的に照合する
 - PASSした申告から、1回の作業境界用のFresh Handoffを作る
 - 境界状態を比較して、CONTINUE / Re-KYを判定する

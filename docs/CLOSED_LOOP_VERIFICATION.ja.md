@@ -1,6 +1,6 @@
-# Closed-loop Verification — NazeYatta 1.1 開発中
+# Closed-loop Verification — NazeYatta 1.1
 
-**状態:** 1.1開発中 / main向け / 公開済みPyPI 1.0.0にはまだ含まれません。
+**状態:** NazeYatta 1.1.0 のstable機能です。
 
 NazeYatta 1.0は、**やる前**を確認します。
 
@@ -68,7 +68,7 @@ AIの自己申告 != 確認済みEvidence
 
 ## コマンド
 
-開発中のCLI：
+CLI：
 
 ```bash
 nazeyatta verify request.yaml observation.yaml
