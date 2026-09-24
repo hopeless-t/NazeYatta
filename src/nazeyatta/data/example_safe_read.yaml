@@ -1,0 +1,11 @@
+task_id: EX-SAFE-READ
+action:
+  operation: read
+  side_effect: none
+  externality: internal
+worker:
+  required_capability: read_repository
+semantics:
+  critical_meaning_complete: true
+evidence:
+  worker_capability_qualified: VERIFIED

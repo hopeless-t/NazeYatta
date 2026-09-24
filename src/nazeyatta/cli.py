@@ -24,8 +24,18 @@ EXIT_NOT_PASS = 2
 EXIT_INVALID_INPUT = 3
 
 
+EXAMPLE_FILES = {
+    "publish-photo": "example_publish_photo.yaml",
+    "safe-read": "example_safe_read.yaml",
+}
+
+
 def default_policy_path() -> Path:
     return Path(__file__).resolve().parent / "data" / "generic_rules.yaml"
+
+
+def packaged_example_path(name: str) -> Path:
+    return Path(__file__).resolve().parent / "data" / EXAMPLE_FILES[name]
 
 
 def _prepare_stdout() -> None:
@@ -112,6 +122,22 @@ def cmd_check(args: argparse.Namespace) -> int:
     return EXIT_PASS if receipt.outcome == "PASS" else EXIT_NOT_PASS
 
 
+def cmd_example(args: argparse.Namespace) -> int:
+    """Print one packaged task example without evaluating it."""
+    try:
+        text = packaged_example_path(args.name).read_text(encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"NAZEYATTA\n🚫😾 EXAMPLE READ FAILED\n\n{type(exc).__name__}: {safe_text(exc)}",
+            file=sys.stderr,
+        )
+        return EXIT_INVALID_INPUT
+    sys.stdout.write(text)
+    if text and not text.endswith("\n"):
+        sys.stdout.write("\n")
+    return 0
+
+
 RULE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
@@ -161,6 +187,13 @@ def main() -> int:
         "use provenance-v0.2 to reject legacy scalar evidence",
     )
     c.set_defaults(func=cmd_check)
+
+    e = sub.add_parser(
+        "example",
+        help="print a packaged task example without evaluating it",
+    )
+    e.add_argument("name", choices=sorted(EXAMPLE_FILES))
+    e.set_defaults(func=cmd_example)
 
     d = sub.add_parser("debrief-template", help="emit a structured violation debrief template")
     d.add_argument("rule_id")
