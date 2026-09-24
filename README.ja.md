@@ -134,12 +134,12 @@ NazeYattaが役立つのは、複数のAIや自動化処理で、次のような
 
 Python 3.11以上が必要です。
 
-PyPIから `0.2.0a2` technical prerelease を入れ、同梱Exampleを取り出します。
+PyPIから `0.2.0a3` technical prerelease を入れ、同梱Exampleを取り出します。
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a2"
+python -m pip install "nazeyatta==0.2.0a3"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
@@ -231,6 +231,24 @@ nazeyatta check safe-read.yaml
 ~~~
 
 こちらは PASS（チェック通過）になります。
+
+Task YAMLは、1つのboundedなUTF-8標準入力から渡すこともできます。
+
+~~~bash
+nazeyatta example safe-read | nazeyatta check -
+~~~
+
+ここで `-` は「Task YAMLを標準入力から読む」という意味です。権限や評価意味論を拡張するものではありません。また、1本の標準入力をTaskとPolicyの両方に曖昧に使わないため、`--policy -` は拒否されます。
+
+既存core schemaの、packageに同梱されたexact copyも取り出せます。
+
+~~~bash
+nazeyatta schema task > task.schema.json
+nazeyatta schema evidence > evidence.schema.json
+nazeyatta schema receipt > receipt.schema.json
+~~~
+
+Schemaの取り出しはtransport / convenience用のsurfaceです。**実行権限を与えるものでも、新しいschema semanticsを追加するものでもありません。**
 
 ただし、
 

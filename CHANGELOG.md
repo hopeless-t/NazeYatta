@@ -1,8 +1,6 @@
 # Changelog
 
-## Unreleased — 0.2.0a3 development line
-
-No `0.2.0a3` release has been published yet.
+## 0.2.0a3 — 2026-09-24 — technical prerelease
 
 - allow one bounded UTF-8 Task YAML to be read from stdin with `nazeyatta check -`, while preserving the same 1 MiB input ceiling, structural validation, evaluation semantics, and exit codes as file input;
 - reject `--policy -` explicitly so a single stdin stream cannot ambiguously supply both Task and policy documents;
