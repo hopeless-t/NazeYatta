@@ -30,6 +30,12 @@ EXAMPLE_FILES = {
     "safe-read": "example_safe_read.yaml",
 }
 
+SCHEMA_FILES = {
+    "task": "task.schema.json",
+    "evidence": "evidence.schema.json",
+    "receipt": "receipt.schema.json",
+}
+
 
 def default_policy_path() -> Path:
     return Path(__file__).resolve().parent / "data" / "generic_rules.yaml"
@@ -37,6 +43,10 @@ def default_policy_path() -> Path:
 
 def packaged_example_path(name: str) -> Path:
     return Path(__file__).resolve().parent / "data" / EXAMPLE_FILES[name]
+
+
+def packaged_schema_path(name: str) -> Path:
+    return Path(__file__).resolve().parent / "schemas" / SCHEMA_FILES[name]
 
 
 def _prepare_stdout() -> None:
@@ -160,6 +170,22 @@ def cmd_example(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_schema(args: argparse.Namespace) -> int:
+    """Print one packaged core JSON Schema without interpreting it."""
+    try:
+        text = packaged_schema_path(args.name).read_text(encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"NAZEYATTA\n🚫😾 SCHEMA READ FAILED\n\n{type(exc).__name__}: {safe_text(exc)}",
+            file=sys.stderr,
+        )
+        return EXIT_INVALID_INPUT
+    sys.stdout.write(text)
+    if text and not text.endswith("\n"):
+        sys.stdout.write("\n")
+    return 0
+
+
 RULE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
@@ -217,6 +243,13 @@ def main() -> int:
     )
     e.add_argument("name", choices=sorted(EXAMPLE_FILES))
     e.set_defaults(func=cmd_example)
+
+    s = sub.add_parser(
+        "schema",
+        help="print a packaged core JSON Schema without validating input",
+    )
+    s.add_argument("name", choices=sorted(SCHEMA_FILES))
+    s.set_defaults(func=cmd_schema)
 
     d = sub.add_parser("debrief-template", help="emit a structured violation debrief template")
     d.add_argument("rule_id")

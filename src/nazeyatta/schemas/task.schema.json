@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:task:0.2",
+  "title": "NazeYatta Task",
+  "type": "object",
+  "required": [
+    "task_id",
+    "action",
+    "semantics",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "0.1",
+        "0.2"
+      ]
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "object",
+      "required": [
+        "operation",
+        "side_effect",
+        "externality"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "side_effect": {
+          "enum": [
+            "none",
+            "write",
+            "external_write",
+            "destructive"
+          ]
+        },
+        "externality": {
+          "enum": [
+            "internal",
+            "public"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "worker": {
+      "type": "object"
+    },
+    "data": {
+      "type": "object"
+    },
+    "semantics": {
+      "type": "object",
+      "required": [
+        "critical_meaning_complete"
+      ],
+      "properties": {
+        "critical_meaning_complete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "evidence_records": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "evidence.schema.json"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "0.2"
+          }
+        },
+        "required": [
+          "schema_version"
+        ]
+      },
+      "then": {
+        "required": [
+          "evidence_records"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": true
+}
