@@ -2,11 +2,13 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-**NazeYatta is a small command-line preflight checker for AI workers and automation.**
+**NazeYatta is a small command-line preflight and post-action verification checker for AI workers and automation.**
 
-It answers one narrow question:
+It answers two bounded questions:
 
 > **Before this action happens, are the required checks actually satisfied?**
+>
+> **After an external caller acted, did the observed postconditions exactly match what was expected?**
 
 If the answer is not established, NazeYatta does not guess.
 
@@ -40,7 +42,7 @@ Requires Python 3.11+.
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==1.0.0"
+python -m pip install "nazeyatta==1.1.0"
 
 nazeyatta example publish-photo > task.yaml
 nazeyatta check task.yaml
@@ -118,12 +120,12 @@ Examples:
 
 Requires Python 3.11+.
 
-Install the stable `1.0.0` release from PyPI and extract a packaged example:
+Install the stable `1.1.0` release from PyPI and extract a packaged example:
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==1.0.0"
+python -m pip install "nazeyatta==1.1.0"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
@@ -320,7 +322,7 @@ Read them when you need the deeper model:
 - [Policy Model](docs/POLICY_MODEL.md) — applicability and policy effects
 - [Threat Model](docs/THREAT_MODEL.md) — what the project assumes can go wrong
 - [Roadmap](docs/ROADMAP.md) — implemented, research, and deliberately deferred work
-- [Closed-loop Verification 1.1 development](docs/CLOSED_LOOP_VERIFICATION.md) — exact post-action verification; **not included in PyPI 1.0.0**
+- [Closed-loop Verification 1.1](docs/CLOSED_LOOP_VERIFICATION.md) — exact post-action verification with `VERIFIED_SUCCESS / VERIFIED_FAILURE / UNKNOWN`
 - [Violation Debrief](docs/VIOLATION_DEBRIEF.md) — post-failure debrief structure
 - [Japanese First Steps](docs/FIRST_STEPS.ja.md) — a more procedural Japanese introduction
 
@@ -328,7 +330,7 @@ Read them when you need the deeper model:
 
 ## Current status
 
-NazeYatta `1.0` is a **stable command-line preflight checker** with a deliberately bounded support contract.
+NazeYatta `1.1` is a **stable command-line preflight and exact post-action verification checker** with a deliberately bounded support contract.
 
 Supported stable CLI foundation (see [Stable Core 1.0](docs/STABLE_CORE_1_0.md)):
 
@@ -340,6 +342,7 @@ Supported stable CLI foundation (see [Stable Core 1.0](docs/STABLE_CORE_1_0.md))
 - deterministic task/policy fingerprints;
 - a provenance-linked v0.2 input lane;
 - structured violation-debrief templates;
+- exact post-action verification with neutral machine outcomes and playful human projection;
 - tests and examples.
 
 The repository also contains bounded experimental/library contracts for:
