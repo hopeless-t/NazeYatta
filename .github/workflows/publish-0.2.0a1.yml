@@ -1,0 +1,312 @@
+name: Publish NazeYatta 0.2.0a1
+
+on:
+  push:
+    branches:
+      - release/0.2.0a1-publish
+
+permissions:
+  contents: write
+
+env:
+  FINAL_COMMIT: fa11c1c3eaf581cc025669ae5c60b0a2f114a5e2
+  TAG: v0.2.0a1
+
+jobs:
+  build:
+    name: Build exact final candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert workflow-only publication instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$FINAL_COMMIT" HEAD
+          CHANGED="$(git diff --name-only "$FINAL_COMMIT"...HEAD)"
+          test "$CHANGED" = ".github/workflows/publish-0.2.0a1.yml" || {
+            echo "unexpected publication-branch delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Checkout exact final source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "$FINAL_COMMIT"
+          test "$(git rev-parse HEAD)" = "$FINAL_COMMIT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build frontend and source test dependencies
+        run: |
+          python -m pip install --upgrade pip build
+          python -m pip install -e . pytest
+
+      - name: Run final source suite
+        run: python -m pytest -q
+
+      - name: Build final wheel and sdist
+        run: python -m build
+
+      - name: Record final hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          (
+            cd dist
+            sha256sum * > ../release-evidence/SHA256SUMS.txt
+          )
+          {
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "final_commit=$FINAL_COMMIT"
+            echo "candidate_version=0.2.0a1"
+            echo "publication_authorized=true"
+            echo "pypi_publication_authorized=false"
+            echo
+            echo "[dist]"
+            ls -l dist/
+            echo
+            echo "[sha256]"
+            cat release-evidence/SHA256SUMS.txt
+          } | tee release-evidence/build-receipt.txt
+
+      - name: Upload final distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a1-final-dist
+          path: |
+            dist/*
+            release-evidence/SHA256SUMS.txt
+            release-evidence/build-receipt.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  verify-wheel:
+    name: Fresh final wheel / Python ${{ matrix.python-version }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FINAL_COMMIT }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a1-final-dist
+          path: candidate-artifact
+
+      - name: Fresh install exact built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .verify-venv
+          . .verify-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install candidate-artifact/dist/*.whl
+
+      - name: Verify version and canonical receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          EVIDENCE="$GITHUB_WORKSPACE/release-evidence/python-${{ matrix.python-version }}"
+          mkdir -p "$EVIDENCE"
+          mkdir -p /tmp/nazeyatta-final-verify
+          cd /tmp/nazeyatta-final-verify
+
+          python - <<'PY'
+          from importlib.metadata import version
+          import nazeyatta
+          assert version("nazeyatta") == "0.2.0a1"
+          assert nazeyatta.__version__ == "0.2.0a1"
+          print("package_version=0.2.0a1")
+          print("runtime_version=0.2.0a1")
+          PY
+
+          set +e
+          nazeyatta check "$GITHUB_WORKSPACE/examples/publish-photo.yaml" > "$EVIDENCE/publish-photo-block.txt" 2>&1
+          BLOCK_EXIT=$?
+          set -e
+          test "$BLOCK_EXIT" -eq 2
+          grep -q "BLOCK" "$EVIDENCE/publish-photo-block.txt"
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" "$EVIDENCE/publish-photo-block.txt"
+
+          nazeyatta check "$GITHUB_WORKSPACE/examples/safe-read.yaml" > "$EVIDENCE/safe-read-pass.txt" 2>&1
+          PASS_EXIT=$?
+          test "$PASS_EXIT" -eq 0
+          grep -q "PASS" "$EVIDENCE/safe-read-pass.txt"
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" "$EVIDENCE/safe-read-pass.txt"
+
+          nazeyatta check "$GITHUB_WORKSPACE/examples/safe-read.yaml" --json > "$EVIDENCE/safe-read-receipt.json"
+          python - "$EVIDENCE/safe-read-receipt.json" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert data["evaluator_version"] == "0.2.0a1"
+          assert data["outcome"] == "PASS"
+          assert data["authority_granted"] is False
+          print("receipt_version=0.2.0a1")
+          PY
+
+          {
+            echo "final_commit=$FINAL_COMMIT"
+            echo "python=$(python --version 2>&1)"
+            echo "package_version=$(python -c 'from importlib.metadata import version; print(version("nazeyatta"))')"
+            echo "block_exit=$BLOCK_EXIT"
+            echo "pass_exit=$PASS_EXIT"
+          } > "$EVIDENCE/verification-summary.txt"
+
+      - name: Upload final verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a1-final-python-${{ matrix.python-version }}-evidence
+          path: release-evidence/python-${{ matrix.python-version }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Create GitHub technical prerelease
+    needs: [build, verify-wheel]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FINAL_COMMIT }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a1-final-dist
+          path: candidate-artifact
+
+      - name: Assert release does not already exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $TAG already exists; refusing duplicate publication"
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "tag $TAG already exists; refusing duplicate publication"
+            exit 1
+          fi
+
+      - name: Prepare truthful release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL="$(find candidate-artifact/dist -maxdepth 1 -name '*.whl' -print -quit)"
+          SDIST="$(find candidate-artifact/dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
+          test -n "$WHEEL"
+          test -n "$SDIST"
+          WHEEL_SHA="$(sha256sum "$WHEEL" | awk '{print $1}')"
+          SDIST_SHA="$(sha256sum "$SDIST" | awk '{print $1}')"
+
+          cat > release-notes.md <<EOF
+          NazeYatta 0.2.0a1 is a technical alpha prerelease of the deterministic check-before-you-act kernel for AI workers and automation.
+
+          Highlights:
+          - deterministic no-clobber reusable receipt JSON files;
+          - fail-closed runtime Task structural validation;
+          - dependency-free JSON Schema/runtime parity guards for explicitly shared invariants;
+          - typed Worker KY + KY Gate + FreshHandoff + Boundary Observation / Re-KY contracts;
+          - reusable handoff-bound Boundary Observation construction and consumer-side validation;
+          - exact preflight/runtime artifact correlation;
+          - BaselineDerivationRecord + bounded DerivationSpec + scoped SpecAdoptionRecord;
+          - policy provenance with source/scope/lifecycle binding;
+          - 195-test final source suite;
+          - final built-wheel installation verified on Python 3.11 and 3.12.
+
+          Important boundaries:
+
+          PASS != Execution Authority
+          Worker Declaration != Evidence
+          Fixture Dogfood != Production Runtime
+          Exact Artifact Correlation != Semantic Equivalence
+          Exact Artifact Correlation != Freshness
+          PROVENANCE_BOUND != Authority Authenticated
+          PROVENANCE_BOUND != Normative Correctness Verified
+          RECORD_BOUND != Authority Authenticated
+
+          This prerelease does not claim production end-to-end enforcement, production runtime observation, freshness verification, authority authentication, normative correctness of organization/domain rules, certification, adoption, or production deployment.
+
+          Freshness remains HOLD until a concrete consumer supplies an explicit mapping from generic Task semantics to runtime operation and runtime target identity.
+
+          External first-time onboarding acceptance remains PENDING under Issue #4.
+
+          Verified final source candidate:
+          $FINAL_COMMIT
+
+          Verified distribution SHA-256:
+          - wheel: $WHEEL_SHA
+          - sdist: $SDIST_SHA
+
+          Technical Prerelease != Production Ready
+          EOF
+
+      - name: Create tag and GitHub prerelease with exact verified assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL="$(find candidate-artifact/dist -maxdepth 1 -name '*.whl' -print -quit)"
+          SDIST="$(find candidate-artifact/dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
+          SUMS="candidate-artifact/release-evidence/SHA256SUMS.txt"
+
+          gh release create "$TAG"             "$WHEEL"             "$SDIST"             "$SUMS"             --repo "$GITHUB_REPOSITORY"             --target "$FINAL_COMMIT"             --title "NazeYatta 0.2.0a1 — Bounded Contract Technical Alpha"             --notes-file release-notes.md             --prerelease
+
+      - name: Independent publication readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p publication-readback downloaded-release
+
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG"             > publication-readback/tag-ref.json
+          jq -e --arg sha "$FINAL_COMMIT" '.object.sha == $sha'             publication-readback/tag-ref.json
+
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG"             > publication-readback/release.json
+          jq -e --arg tag "$TAG" --arg sha "$FINAL_COMMIT"             '.tag_name == $tag and .prerelease == true and .target_commitish == $sha'             publication-readback/release.json
+
+          gh release download "$TAG"             --repo "$GITHUB_REPOSITORY"             --dir downloaded-release
+
+          (
+            cd downloaded-release
+            sha256sum -c "$GITHUB_WORKSPACE/candidate-artifact/release-evidence/SHA256SUMS.txt"
+          ) | tee publication-readback/download-sha256.txt
+
+          jq '{
+            tag_name,
+            name,
+            prerelease,
+            published_at,
+            target_commitish,
+            html_url,
+            assets: [.assets[] | {name, size, digest}]
+          }' publication-readback/release.json             > publication-readback/release-summary.json
+
+      - name: Upload publication readback evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.2.0a1-publication-readback
+          path: publication-readback/
+          if-no-files-found: error
+          retention-days: 30
