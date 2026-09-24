@@ -1,4 +1,6 @@
 import copy
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -50,3 +52,21 @@ def test_v02_requires_evidence_records_mapping_even_before_rule_resolution():
 
     with pytest.raises(ValueError, match="evidence_records"):
         evaluate(task, POLICIES)
+
+
+def test_cli_reports_incomplete_task_as_invalid_input(tmp_path):
+    task = tmp_path / "incomplete.yaml"
+    task.write_text("task_id: INCOMPLETE\nevidence: {}\n", encoding="utf-8")
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "nazeyatta.cli", "check", str(task)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=ROOT,
+    )
+
+    assert proc.returncode == 3
+    assert "INVALID INPUT" in proc.stderr
+    assert "action must be a mapping" in proc.stderr
