@@ -8,6 +8,7 @@ No `0.2.0a3` release has been published yet.
 - reject `--policy -` explicitly so a single stdin stream cannot ambiguously supply both Task and policy documents;
 - verify packaged-example-to-stdin pipelines, JSON receipt output, oversized stdin, and invalid UTF-8 fail-closed behavior.
 - package exact copies of the existing core Task, Evidence Record, and Receipt JSON Schemas and expose them with `nazeyatta schema task|evidence|receipt` without adding new schema semantics.
+- add a structured GitHub Concrete Integration Request form that collects the runtime operation, target identity, Task mapping, evidence producer, enforcement placement, and non-PASS behavior needed before held integration work can resume.
 
 ## 0.2.0a2 — 2026-09-24 — technical prerelease
 
