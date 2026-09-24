@@ -11,7 +11,10 @@
   ],
   "properties": {
     "schema_version": {
-      "enum": ["0.1", "0.2"]
+      "enum": [
+        "0.1",
+        "0.2"
+      ]
     },
     "task_id": {
       "type": "string",
@@ -26,7 +29,8 @@
       ],
       "properties": {
         "operation": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "side_effect": {
           "enum": [
@@ -78,11 +82,19 @@
   "allOf": [
     {
       "if": {
-        "properties": {"schema_version": {"const": "0.2"}},
-        "required": ["schema_version"]
+        "properties": {
+          "schema_version": {
+            "const": "0.2"
+          }
+        },
+        "required": [
+          "schema_version"
+        ]
       },
       "then": {
-        "required": ["evidence_records"]
+        "required": [
+          "evidence_records"
+        ]
       }
     }
   ],
