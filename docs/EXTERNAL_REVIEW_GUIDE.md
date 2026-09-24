@@ -71,7 +71,7 @@ These can improve the surface, but are not substitutes for a first-time Human:
 
 ~~~text
 Better Surface != Human Comprehension Evidence
-Technical Prerelease != Onboarding Accepted
+Stable Release != Onboarding Accepted
 ~~~
 
 ## Acceptance interpretation
