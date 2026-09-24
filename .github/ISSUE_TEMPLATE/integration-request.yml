@@ -1,0 +1,105 @@
+name: Concrete integration request
+description: Describe a real workflow that may use NazeYatta so integration work can be routed from concrete evidence instead of generic framework guesses.
+title: "[Integration] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for bringing a concrete consumer.
+
+        NazeYatta deliberately avoids inventing generic runtime adapters, freshness rules, or authority systems without a real workflow to bind them to.
+
+        Please describe the smallest real integration you can. Do not include credentials, private customer data, proprietary source, or other secrets.
+
+        **Integration Request != Implementation Authority**
+        **Concrete Mapping Submitted != Mapping Verified**
+        **Consumer Exists != Production Adoption**
+
+  - type: input
+    id: version
+    attributes:
+      label: NazeYatta version
+      description: Paste `nazeyatta --version` if available.
+      placeholder: "nazeyatta 0.2.0a2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: consumer
+    attributes:
+      label: Concrete system or workflow
+      description: What real tool, agent, CI job, service, or Human workflow would call NazeYatta?
+      placeholder: Describe one actual consumer and the step where preflight would happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: runtime_operation
+    attributes:
+      label: Actual runtime operation and side effects
+      description: What action would happen after preflight? Include the real operation and whether it reads, writes, publishes, deletes, or otherwise changes external state.
+      placeholder: "Example: upload one built artifact to a named staging bucket; external write; no production target."
+    validations:
+      required: true
+
+  - type: textarea
+    id: runtime_target
+    attributes:
+      label: Runtime target identity
+      description: What exact object/system/account/environment is acted on, and how can preflight and execution establish that they refer to the same target?
+      placeholder: Describe the target identifier(s) available both before and at execution time.
+    validations:
+      required: true
+
+  - type: textarea
+    id: task_mapping
+    attributes:
+      label: Task mapping
+      description: How would the real operation map into NazeYatta Task fields such as operation, side_effect, externality, worker/data, and critical meaning?
+      placeholder: A small sanitized YAML example is welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence_source
+    attributes:
+      label: Evidence source or producer
+      description: Who or what supplies each important fact? Distinguish Worker self-report from independently observed or Human-supplied evidence.
+      placeholder: List the evidence source(s), what they observe, and when the observation is made.
+    validations:
+      required: true
+
+  - type: textarea
+    id: placement
+    attributes:
+      label: Preflight and enforcement placement
+      description: Where would NazeYatta run, and what component can actually prevent the action when the result is not PASS?
+      placeholder: "Example: CI step before deploy; deploy job is skipped unless the preflight process exits 0."
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_pass
+    attributes:
+      label: Desired behavior on non-PASS
+      description: What should the surrounding workflow do for BLOCK, REVIEW, EVIDENCE_REQUIRED, invalid input, or other non-PASS results?
+      placeholder: Stop, ask a Human, gather evidence, route elsewhere, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Smallest sanitized reproduction
+      description: Optional. Add a minimal Task, command, pseudocode, or public repository link that demonstrates the integration without secrets.
+      placeholder: Keep this bounded to the smallest useful example.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Boundaries
+      options:
+        - label: I did not include credentials, private customer data, or other secrets.
+          required: true
+        - label: I understand that submitting this request does not make the proposed mapping verified or grant implementation authority.
+          required: true
