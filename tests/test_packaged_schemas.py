@@ -15,6 +15,18 @@ CASES = {
     "task": ("schemas/task.schema.json", "urn:nazeyatta:schema:task:0.2"),
     "evidence": ("schemas/evidence.schema.json", "urn:nazeyatta:schema:evidence:0.2"),
     "receipt": ("schemas/receipt.schema.json", "urn:nazeyatta:schema:receipt:0.2"),
+    "verification-request": (
+        "schemas/post-action-verification-request.schema.json",
+        "urn:nazeyatta:schema:post-action-verification-request:0.1",
+    ),
+    "post-action-observation": (
+        "schemas/post-action-observation.schema.json",
+        "urn:nazeyatta:schema:post-action-observation:0.1",
+    ),
+    "verification-receipt": (
+        "schemas/post-action-verification-receipt.schema.json",
+        "urn:nazeyatta:schema:post-action-verification-receipt:0.1",
+    ),
 }
 
 
