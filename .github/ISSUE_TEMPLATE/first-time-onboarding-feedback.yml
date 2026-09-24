@@ -1,0 +1,120 @@
+name: First-time onboarding feedback
+description: Share what you understood from the public NazeYatta README before receiving an architecture explanation.
+title: "[First-time feedback] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying NazeYatta as a first-time reader.
+
+        Please read only the current public README ([English](../../README.md) or [日本語](../../README.ja.md)) before answering these questions. If possible, try the 30-second example too.
+
+        Please answer in your own words. There are no points for using project terminology.
+
+        This feedback is usability evidence, not an endorsement, security review, or proof that the product is correct.
+
+        **Human Response != Product Endorsement**
+        **README Understood != Production Safety Proven**
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: README language
+      description: Which README did you mainly read?
+      options:
+        - English
+        - 日本語
+        - Both
+        - Other / translated
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: What do you think NazeYatta does?
+      description: Describe the purpose of the tool in your own words.
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: What would you give NazeYatta as input?
+      description: Describe the file, facts, or other information you think the tool expects.
+    validations:
+      required: true
+
+  - type: textarea
+    id: first_command
+    attributes:
+      label: What command would you run first?
+      description: Write the first NazeYatta command you would try after installation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: block_meaning
+    attributes:
+      label: What does BLOCK mean to you?
+      description: Explain what you think should happen when NazeYatta returns BLOCK.
+    validations:
+      required: true
+
+  - type: textarea
+    id: pass_authority
+    attributes:
+      label: Does PASS itself authorize execution?
+      description: Answer yes/no/unsure, then explain why you think so.
+    validations:
+      required: true
+
+  - type: textarea
+    id: check_vs_verify
+    attributes:
+      label: What is the difference between nazeyatta check and nazeyatta verify?
+      description: Explain when you think each command is used.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actor
+    attributes:
+      label: Who actually performs the action?
+      description: If a file is changed, something is published, or another external action occurs, who or what do you think performs it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: receipt_authority
+    attributes:
+      label: Does a NazeYatta receipt itself grant execution or retry authority?
+      description: Answer yes/no/unsure, then explain your understanding.
+    validations:
+      required: true
+
+  - type: textarea
+    id: example_result
+    attributes:
+      label: Did you try the 30-second example?
+      description: Say whether you ran it. If you did, describe what happened. If not, say what stopped you.
+    validations:
+      required: true
+
+  - type: textarea
+    id: confusing
+    attributes:
+      label: What is still confusing?
+      description: Quote or describe anything that was unclear, surprising, missing, or harder than expected.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: test_conditions
+    attributes:
+      label: Test conditions
+      options:
+        - label: I answered these questions before receiving a separate architecture/product explanation from the maintainer or facilitator.
+          required: true
+        - label: I understand that this feedback may be used as public onboarding/usability evidence and is not treated as an endorsement.
+          required: true
