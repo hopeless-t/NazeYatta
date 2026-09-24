@@ -129,6 +129,42 @@ jobs:
             echo "publish_step_boundary_at=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
           } > evidence/pypi-prewrite.txt
 
+      - name: Run NazeYatta preflight from exact GitHub Release wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
+          HELPER="/tmp/live_release_closed_loop.py"
+          git show "$FINAL_COMMIT:tools/live_release_closed_loop.py" > "$HELPER"
+
+          python -m venv .release-preflight
+          .release-preflight/bin/python -m pip install --upgrade pip
+          .release-preflight/bin/python -m pip install "pypi-dist/$WHEEL"
+
+          .release-preflight/bin/python "$HELPER" preflight-task \
+            --version "$VERSION" \
+            --final-commit "$FINAL_COMMIT" \
+            --release-channel "$RELEASE_CHANNEL" \
+            --repository "$GITHUB_REPOSITORY" \
+            --sha256s evidence/SHA256SUMS.txt \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
+            --out evidence/live-preflight-task.json
+
+          .release-preflight/bin/nazeyatta check \
+            evidence/live-preflight-task.json \
+            --require-lane provenance-v0.2 \
+            --receipt-out evidence/live-preflight-receipt.json \
+            --json > evidence/live-preflight-stdout.json
+
+          .release-preflight/bin/python "$HELPER" verification-request \
+            --task evidence/live-preflight-task.json \
+            --receipt evidence/live-preflight-receipt.json \
+            --out evidence/live-verification-request.json
+
+          jq -e \
+            '.outcome == "PASS" and .authority_granted == false and .evidence_lane == "provenance-v0.2"' \
+            evidence/live-preflight-receipt.json
+
       - name: Publish through environment-scoped PyPI Trusted Publisher
         id: trusted_publish
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -189,6 +225,39 @@ jobs:
             echo "release_channel=$RELEASE_CHANNEL"
             echo "publication_performed=true"
           } > evidence/publication-route.txt
+
+      - name: Live self-verify with exact PyPI re-downloaded wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
+          SDIST="nazeyatta-${VERSION}.tar.gz"
+          HELPER="/tmp/live_release_closed_loop.py"
+          git show "$FINAL_COMMIT:tools/live_release_closed_loop.py" > "$HELPER"
+
+          python -m venv .public-verify
+          .public-verify/bin/python -m pip install --upgrade pip
+          .public-verify/bin/python -m pip install "pypi-redownload/$WHEEL"
+
+          .public-verify/bin/python "$HELPER" observation \
+            --request evidence/live-verification-request.json \
+            --release-json evidence/release.json \
+            --pypi-json evidence/pypi-after.json \
+            --wheel "pypi-redownload/$WHEEL" \
+            --sdist "pypi-redownload/$SDIST" \
+            --observed-at "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
+            --out evidence/live-post-action-observation.json
+
+          .public-verify/bin/nazeyatta --version > evidence/live-verifier-version.txt
+          .public-verify/bin/nazeyatta verify \
+            evidence/live-verification-request.json \
+            evidence/live-post-action-observation.json \
+            --receipt-out evidence/live-verification-receipt.json \
+            --json > evidence/live-verification-stdout.json
+
+          jq -e \
+            '.outcome == "VERIFIED_SUCCESS" and .authority_granted == false and .retry_authorized == false' \
+            evidence/live-verification-receipt.json
 
       - name: Upload PyPI publication evidence
         if: always()

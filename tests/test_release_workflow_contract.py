@@ -89,3 +89,39 @@ def test_pypi_write_is_human_gated_manual_and_oidc_scoped():
     assert "EXPECTED_PRERELEASE" in text
     assert "release_channel=$RELEASE_CHANNEL" in text
     assert "publication_performed=true" in text
+
+def test_pypi_release_runs_exact_artifact_closed_loop_self_dogfood():
+    document = _load(PYPI_RELEASE)
+    steps = document["jobs"]["publish-pypi"]["steps"]
+    names = [step.get("name", "") for step in steps if isinstance(step, dict)]
+
+    pre_name = "Run NazeYatta preflight from exact GitHub Release wheel"
+    publish_name = "Publish through environment-scoped PyPI Trusted Publisher"
+    post_name = "Live self-verify with exact PyPI re-downloaded wheel"
+    upload_name = "Upload PyPI publication evidence"
+
+    assert names.index(pre_name) < names.index(publish_name) < names.index(post_name) < names.index(upload_name)
+
+    by_name = {
+        step.get("name"): step
+        for step in steps
+        if isinstance(step, dict) and step.get("name")
+    }
+    preflight = by_name[pre_name]["run"]
+    postflight = by_name[post_name]["run"]
+
+    assert 'git show "$FINAL_COMMIT:tools/live_release_closed_loop.py"' in preflight
+    assert '.release-preflight/bin/python -m pip install "pypi-dist/$WHEEL"' in preflight
+    assert ".release-preflight/bin/nazeyatta check" in preflight
+    assert "--require-lane provenance-v0.2" in preflight
+    assert "live-preflight-receipt.json" in preflight
+    assert "live-verification-request.json" in preflight
+
+    assert 'git show "$FINAL_COMMIT:tools/live_release_closed_loop.py"' in postflight
+    assert '.public-verify/bin/python -m pip install "pypi-redownload/$WHEEL"' in postflight
+    assert ".public-verify/bin/nazeyatta verify" in postflight
+    assert "live-post-action-observation.json" in postflight
+    assert "live-verification-receipt.json" in postflight
+    assert '"VERIFIED_SUCCESS"' in postflight
+    assert ".authority_granted == false" in postflight
+    assert ".retry_authorized == false" in postflight
