@@ -4,6 +4,8 @@
 
 No `0.2.0a4` release has been published yet.
 
+- add a non-publishing first-party GitHub Release mapping dogfood that derives generic preflight action semantics and exact KY/runtime target identity from one adapter-owned historical Release Intent, while keeping semantic equivalence, freshness, and authority claims false.
+
 ## 0.2.0a3 — 2026-09-24 — technical prerelease
 
 - allow one bounded UTF-8 Task YAML to be read from stdin with `nazeyatta check -`, while preserving the same 1 MiB input ceiling, structural validation, evaluation semantics, and exit codes as file input;
