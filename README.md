@@ -54,6 +54,15 @@ That is the core behavior: if a required fact is not established, NazeYatta does
 
 > **PASS means the supplied preflight passed. PASS does not grant execution authority.**
 
+This first example intentionally teaches the **preflight** half first. After a separate Human / Worker / Harness actually acts, `nazeyatta verify request.yaml observation.yaml` can compare exact expected postconditions with observed facts.
+
+```text
+nazeyatta check   = before the action
+nazeyatta verify  = after the action
+```
+
+Neither command performs the action, grants execution authority, or grants retry authority.
+
 The longer walkthrough is in [Run one example](#run-one-example).
 
 ---
@@ -67,19 +76,29 @@ Something wants to act
 task snapshot + known facts
         |
         v
-   NazeYatta
-   checks rules
+nazeyatta check
         |
         v
 PASS / REVIEW / BLOCK
-+ receipt of what was checked
++ preflight receipt
         |
         v
 a separate Human / Worker / Harness
-decides or performs the actual action
+decides and, if authorized, performs the action
+        |
+        v
+post-action observation
++ exact expected facts
+        |
+        v
+nazeyatta verify
+        |
+        v
+VERIFIED_SUCCESS / VERIFIED_FAILURE / UNKNOWN
++ verification receipt
 ~~~
 
-Think of it as a **preflight checklist that a machine can evaluate**.
+Think of it as a **machine-readable preflight checklist plus an exact post-action checker**.
 
 It is useful when you do **not** want:
 
@@ -103,6 +122,7 @@ NazeYatta becomes useful when you want several workflows or AI workers to share 
 - reusable preflight rules;
 - consistent CLI exit behavior;
 - a receipt showing what was checked;
+- exact comparison of expected postconditions with observed facts after an external action;
 - a hard boundary between **evidence** and **permission to execute**.
 
 Examples:
@@ -112,7 +132,8 @@ Examples:
 - before publishing content;
 - before an external write;
 - before using a capability that must be qualified;
-- before acting on a target whose identity must be confirmed.
+- before acting on a target whose identity must be confirmed;
+- after a deployment, publication, or other external action when you want to verify exact observed results.
 
 ---
 
