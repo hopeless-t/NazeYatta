@@ -1,0 +1,128 @@
+name: Publish NazeYatta 0.1.0a2 Technical Alpha
+
+on:
+  push:
+    branches:
+      - release/v0.1.0a2-publish
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CANDIDATE: 438b51403b059aa5ae1f9bf82a7a33609db4b18f
+      TAG: v0.1.0a2
+      ARTIFACT_ID: "10788450613"
+      WHEEL_SHA256: 3e80fc0361343fe5fad8355971fa983108b4bf716c7f62568ab0075a6827ab5a
+      SDIST_SHA256: e65e8d94c3579f3c3e4f98ac05e49c889597988069f24ed10954cab8ad196025
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert exact candidate and publication-only delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "$CANDIDATE" || {
+            echo "STOP: main moved after publication authorization"
+            echo "expected=$CANDIDATE"
+            echo "observed=$(git rev-parse origin/main)"
+            exit 1
+          }
+
+          git merge-base --is-ancestor "$CANDIDATE" HEAD
+          CHANGED="$(git diff --name-only "$CANDIDATE"...HEAD)"
+          test "$CHANGED" = ".github/workflows/publish-0.1.0a2.yml" || {
+            echo "STOP: unexpected publication branch delta"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "STOP: tag already exists"
+            exit 1
+          fi
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "STOP: release already exists"
+            exit 1
+          fi
+
+      - name: Download exact verified distribution artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verified-artifact
+          gh api             -H "Accept: application/vnd.github+json"             "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"             > /tmp/nazeyatta-final-dist.zip
+          unzip -q /tmp/nazeyatta-final-dist.zip -d verified-artifact
+          find verified-artifact -type f -maxdepth 4 -print | sort
+
+      - name: Re-verify distribution hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL="verified-artifact/dist/nazeyatta-0.1.0a2-py3-none-any.whl"
+          SDIST="verified-artifact/dist/nazeyatta-0.1.0a2.tar.gz"
+
+          test -f "$WHEEL"
+          test -f "$SDIST"
+
+          echo "$WHEEL_SHA256  $WHEEL" | sha256sum -c -
+          echo "$SDIST_SHA256  $SDIST" | sha256sum -c -
+
+      - name: Write release notes
+        shell: bash
+        run: |
+          cat > /tmp/release-notes.md <<'EOF'
+          NazeYatta 0.1.0a2 is a technical alpha prerelease of the deterministic check-before-you-act kernel for AI workers and automation.
+
+          Highlights:
+          - deterministic YAML preflight evaluation with explicit evidence states;
+          - fail-closed input/policy hardening;
+          - provenance-linked v0.2 evidence input;
+          - typed Worker KY declaration + deterministic KY Gate;
+          - bounded Fresh Handoff and Boundary Observation / Re-KY contracts;
+          - fresh-process read-only fixture dogfood;
+          - BaselineDerivationRecord, bounded DerivationSpec, and scoped SpecAdoptionRecord;
+          - rebuilt English/Japanese onboarding README;
+          - 151-test current source suite;
+          - fresh wheel installation verified on Python 3.11 and 3.12.
+
+          Important boundaries:
+
+          ```text
+          PASS != Execution Authority
+          Worker Declaration != Evidence
+          Fixture Dogfood != Production Runtime
+          RECORD_BOUND != Authority Authenticated
+          PROVENANCE_BOUND != Semantic Correctness Verified
+          ```
+
+          This prerelease does not claim production end-to-end enforcement, production runtime observation, authority authentication, normative correctness of organization/domain rules, certification, adoption, or production deployment.
+
+          External first-time onboarding acceptance remains **PENDING** under Issue #4. The README has been redesigned and technically verified, but a fresh no-prior-context Human usability observation has not yet been obtained.
+
+          ```text
+          Technical Prerelease != External UX Accepted
+          ```
+
+          Verified source candidate:
+          `438b51403b059aa5ae1f9bf82a7a33609db4b18f`
+
+          Verified distribution SHA-256:
+          - wheel: `3e80fc0361343fe5fad8355971fa983108b4bf716c7f62568ab0075a6827ab5a`
+          - sdist: `e65e8d94c3579f3c3e4f98ac05e49c889597988069f24ed10954cab8ad196025`
+          EOF
+
+      - name: Publish prerelease from verified artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$TAG"             "verified-artifact/dist/nazeyatta-0.1.0a2-py3-none-any.whl"             "verified-artifact/dist/nazeyatta-0.1.0a2.tar.gz"             --repo "$GITHUB_REPOSITORY"             --target "$CANDIDATE"             --title "NazeYatta 0.1.0a2 — Technical Alpha"             --notes-file /tmp/release-notes.md             --prerelease
