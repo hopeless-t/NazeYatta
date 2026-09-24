@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:post-action-verification-request:0.1",
+  "title": "NazeYatta Post-Action Verification Request",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "classification",
+    "verification_id",
+    "task_id",
+    "preflight_receipt_fingerprint",
+    "task_fingerprint",
+    "action_fingerprint",
+    "target_binding",
+    "expected_facts",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "classification": {"const": "POST_ACTION_VERIFICATION_REQUEST"},
+    "verification_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "preflight_receipt_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "task_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "action_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "target_binding": {
+      "type": "object",
+      "required": ["kind", "identifier", "identity_fingerprint"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:/-]{0,127}$"},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+        "identity_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "expected_facts": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_.-]{0,63}$"},
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "string", "maxLength": 1024},
+          {"type": "boolean"},
+          {"type": "integer"}
+        ]
+      }
+    },
+    "authority_granted": {"const": false}
+  },
+  "additionalProperties": false
+}

@@ -320,6 +320,7 @@ Read them when you need the deeper model:
 - [Policy Model](docs/POLICY_MODEL.md) — applicability and policy effects
 - [Threat Model](docs/THREAT_MODEL.md) — what the project assumes can go wrong
 - [Roadmap](docs/ROADMAP.md) — implemented, research, and deliberately deferred work
+- [Closed-loop Verification 1.1 development](docs/CLOSED_LOOP_VERIFICATION.md) — exact post-action verification; **not included in PyPI 1.0.0**
 - [Violation Debrief](docs/VIOLATION_DEBRIEF.md) — post-failure debrief structure
 - [Japanese First Steps](docs/FIRST_STEPS.ja.md) — a more procedural Japanese introduction
 

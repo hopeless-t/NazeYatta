@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:post-action-verification-receipt:0.1",
+  "title": "NazeYatta Post-Action Verification Receipt",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "classification",
+    "verification_id",
+    "task_id",
+    "request_fingerprint",
+    "observation_fingerprint",
+    "preflight_receipt_fingerprint",
+    "task_fingerprint",
+    "action_fingerprint",
+    "target_binding_fingerprint",
+    "outcome",
+    "reasons",
+    "authority_granted",
+    "retry_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "classification": {"const": "POST_ACTION_VERIFICATION_RECEIPT"},
+    "verification_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "request_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "observation_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "preflight_receipt_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "task_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "action_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "target_binding_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "outcome": {"enum": ["VERIFIED_SUCCESS", "VERIFIED_FAILURE", "UNKNOWN"]},
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "fact_id", "expected", "observation_state", "observed"],
+        "properties": {
+          "code": {"enum": ["FACT_MISMATCH", "FACT_UNKNOWN", "FACT_NOT_OBSERVED"]},
+          "fact_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,63}$"},
+          "expected": {
+            "oneOf": [{"type": "string"}, {"type": "boolean"}, {"type": "integer"}]
+          },
+          "observation_state": {"enum": ["OBSERVED", "UNKNOWN"]},
+          "observed": {
+            "oneOf": [
+              {"type": "string"},
+              {"type": "boolean"},
+              {"type": "integer"},
+              {"type": "null"}
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "authority_granted": {"const": false},
+    "retry_authorized": {"const": false}
+  },
+  "additionalProperties": false
+}

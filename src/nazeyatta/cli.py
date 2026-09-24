@@ -4,11 +4,14 @@ import argparse
 import json
 import re
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__
 from .evaluator import EVIDENCE_LANES, MAX_INPUT_BYTES, evaluate, load_yaml, load_yaml_text
 from .receipt_io import write_receipt_json
+from .verification import VerificationError, verify_post_action
+from .verification_io import write_verification_receipt_json
 
 EMOJI = {
     "PASS": "✅😺",
@@ -34,6 +37,9 @@ SCHEMA_FILES = {
     "task": "task.schema.json",
     "evidence": "evidence.schema.json",
     "receipt": "receipt.schema.json",
+    "verification-request": "post-action-verification-request.schema.json",
+    "post-action-observation": "post-action-observation.schema.json",
+    "verification-receipt": "post-action-verification-receipt.schema.json",
 }
 
 
@@ -154,6 +160,78 @@ def cmd_check(args: argparse.Namespace) -> int:
     return EXIT_PASS if receipt.outcome == "PASS" else EXIT_NOT_PASS
 
 
+def _display_scalar(value: object) -> str:
+    return safe_text(json.dumps(value, ensure_ascii=False, sort_keys=True), limit=MAX_FIELD_CHARS)
+
+
+def print_verification_receipt(receipt) -> None:
+    print("NAZEYATTA")
+    print("👈😽 POST-FLIGHT VERIFY")
+    print()
+
+    icon = {
+        "VERIFIED_SUCCESS": "✅😺",
+        "VERIFIED_FAILURE": "🙀😿",
+        "UNKNOWN": "🔎😿",
+    }[receipt.outcome]
+    print(f"{icon} {receipt.outcome}")
+    print()
+
+    if receipt.outcome == "VERIFIED_SUCCESS":
+        print("Expected and observed facts matched exactly.")
+    elif receipt.outcome == "VERIFIED_FAILURE":
+        print("🙀 NAZE YATTA?")
+        print("Observed facts contradicted one or more expected postconditions.")
+    else:
+        print("Required postcondition facts were not fully observed.")
+
+    for reason in receipt.reasons:
+        print()
+        print(safe_text(reason["fact_id"], 80))
+        print(f"  expected: {_display_scalar(reason['expected'])}")
+        if reason["observation_state"] == "UNKNOWN":
+            print("  observed: UNKNOWN")
+        else:
+            print(f"  observed: {_display_scalar(reason['observed'])}")
+        print(f"  reason: {safe_text(reason['code'], 80)}")
+
+    print()
+    print("EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA")
+    print("RETRY AUTHORITY: NOT GRANTED BY NAZEYATTA")
+    print(f"request_fingerprint: {receipt.request_fingerprint}")
+    print(f"observation_fingerprint: {receipt.observation_fingerprint}")
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    try:
+        request = load_yaml(args.request)
+        observation = load_yaml(args.observation)
+        receipt = verify_post_action(request, observation)
+    except (VerificationError, ValueError, OSError) as exc:
+        print(
+            f"NAZEYATTA\n🚫😾 INVALID VERIFICATION INPUT\n\n{type(exc).__name__}: {safe_text(exc)}",
+            file=sys.stderr,
+        )
+        return EXIT_INVALID_INPUT
+
+    if args.receipt_out:
+        try:
+            write_verification_receipt_json(receipt, args.receipt_out)
+        except OSError as exc:
+            print(
+                f"NAZEYATTA\n🚫😾 RECEIPT WRITE FAILED\n\n{type(exc).__name__}: {safe_text(exc)}",
+                file=sys.stderr,
+            )
+            return EXIT_INVALID_INPUT
+
+    if args.json:
+        print(json.dumps(asdict(receipt), ensure_ascii=False, indent=2))
+    else:
+        print_verification_receipt(receipt)
+
+    return EXIT_PASS if receipt.outcome == "VERIFIED_SUCCESS" else EXIT_NOT_PASS
+
+
 def cmd_example(args: argparse.Namespace) -> int:
     """Print one packaged task example without evaluating it."""
     try:
@@ -236,6 +314,21 @@ def main() -> int:
         "use provenance-v0.2 to reject legacy scalar evidence",
     )
     c.set_defaults(func=cmd_check)
+
+    v = sub.add_parser(
+        "verify",
+        help="verify exact post-action facts without executing or retrying the action",
+    )
+    v.add_argument("request", help="VerificationRequest YAML path")
+    v.add_argument("observation", help="PostActionObservation YAML path")
+    v.add_argument("--json", action="store_true")
+    v.add_argument(
+        "--receipt-out",
+        default=None,
+        metavar="PATH",
+        help="write the VerificationReceipt as deterministic UTF-8 JSON; refuses to overwrite PATH",
+    )
+    v.set_defaults(func=cmd_verify)
 
     e = sub.add_parser(
         "example",

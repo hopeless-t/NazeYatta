@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nazeyatta:schema:post-action-observation:0.1",
+  "title": "NazeYatta Post-Action Observation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "classification",
+    "observation_id",
+    "verification_id",
+    "task_id",
+    "preflight_receipt_fingerprint",
+    "task_fingerprint",
+    "action_fingerprint",
+    "target_binding",
+    "observed_facts",
+    "observed_by",
+    "observed_at",
+    "authority_granted"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "classification": {"const": "POST_ACTION_OBSERVATION"},
+    "observation_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "verification_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "preflight_receipt_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "task_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "action_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "target_binding": {
+      "type": "object",
+      "required": ["kind", "identifier", "identity_fingerprint"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:/-]{0,127}$"},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 256},
+        "identity_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "observed_facts": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_.-]{0,63}$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["observation_state", "value"],
+        "properties": {
+          "observation_state": {"enum": ["OBSERVED", "UNKNOWN"]},
+          "value": {
+            "oneOf": [
+              {"type": "string", "maxLength": 1024},
+              {"type": "boolean"},
+              {"type": "integer"},
+              {"type": "null"}
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"observation_state": {"const": "UNKNOWN"}}},
+            "then": {"properties": {"value": {"type": "null"}}}
+          },
+          {
+            "if": {"properties": {"observation_state": {"const": "OBSERVED"}}},
+            "then": {
+              "properties": {
+                "value": {
+                  "oneOf": [
+                    {"type": "string", "maxLength": 1024},
+                    {"type": "boolean"},
+                    {"type": "integer"}
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "observed_by": {
+      "type": "object",
+      "required": ["type", "identifier"],
+      "properties": {
+        "type": {"enum": ["human", "adapter", "workflow"]},
+        "identifier": {"type": "string", "minLength": 1, "maxLength": 128}
+      },
+      "additionalProperties": false
+    },
+    "observed_at": {"type": "string", "format": "date-time"},
+    "authority_granted": {"const": false}
+  },
+  "additionalProperties": false
+}
