@@ -1,0 +1,183 @@
+name: Release Verify 0.1.0a2 Final
+
+on:
+  push:
+    branches:
+      - release/0.1.0a2-final-verify
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build wheel and sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Assert exact final candidate plus verification-only instrumentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="438b51403b059aa5ae1f9bf82a7a33609db4b18f"
+          git merge-base --is-ancestor "$BASE" HEAD || {
+            echo "final candidate source commit is not an ancestor"
+            exit 1
+          }
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          test "$CHANGED" = ".github/workflows/release-verify-final.yml" || {
+            echo "unexpected final candidate delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Install build frontend
+        run: python -m pip install --upgrade pip build
+
+      - name: Run source test suite
+        run: |
+          python -m pip install -e . pytest
+          python -m pytest -q
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Record build manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-evidence
+          {
+            echo "repository=hopeless-t/NazeYatta"
+            echo "candidate_source_commit=438b51403b059aa5ae1f9bf82a7a33609db4b18f"
+            echo "verification_commit=$(git rev-parse HEAD)"
+            echo "candidate_version=0.1.0a2"
+            echo "external_onboarding_acceptance=PENDING"
+            echo "builder_python=$(python --version 2>&1)"
+            echo
+            echo "[dist]"
+            ls -l dist/
+            echo
+            echo "[sha256]"
+            sha256sum dist/*
+          } | tee release-evidence/build-receipt.txt
+
+      - name: Upload built distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.1.0a2-final-dist
+          path: |
+            dist/*
+            release-evidence/build-receipt.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-wheel:
+    name: Fresh wheel install / Python ${{ matrix.python-version }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nazeyatta-0.1.0a2-final-dist
+          path: candidate-artifact
+
+      - name: Fresh install built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .verify-venv
+          . .verify-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install candidate-artifact/dist/*.whl
+
+      - name: Verify installed version away from source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          mkdir -p /tmp/nazeyatta-wheel-verify
+          cd /tmp/nazeyatta-wheel-verify
+          python - <<'PY'
+          from importlib.metadata import version
+          import nazeyatta
+          assert version("nazeyatta") == "0.1.0a2"
+          assert nazeyatta.__version__ == "0.1.0a2"
+          print("package_version=0.1.0a2")
+          print("runtime_version=0.1.0a2")
+          PY
+
+      - name: Capture canonical PASS and BLOCK receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .verify-venv/bin/activate
+          EVIDENCE="$GITHUB_WORKSPACE/release-evidence/python-${{ matrix.python-version }}"
+          mkdir -p "$EVIDENCE"
+
+          cd /tmp/nazeyatta-wheel-verify
+
+          set +e
+          nazeyatta check "$GITHUB_WORKSPACE/examples/publish-photo.yaml" > "$EVIDENCE/publish-photo-block.txt" 2>&1
+          BLOCK_EXIT=$?
+          set -e
+          echo "$BLOCK_EXIT" > "$EVIDENCE/publish-photo-block.exit"
+          test "$BLOCK_EXIT" -eq 2
+          grep -q "BLOCK" "$EVIDENCE/publish-photo-block.txt"
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" "$EVIDENCE/publish-photo-block.txt"
+
+          nazeyatta check "$GITHUB_WORKSPACE/examples/safe-read.yaml" > "$EVIDENCE/safe-read-pass.txt" 2>&1
+          PASS_EXIT=$?
+          echo "$PASS_EXIT" > "$EVIDENCE/safe-read-pass.exit"
+          test "$PASS_EXIT" -eq 0
+          grep -q "PASS" "$EVIDENCE/safe-read-pass.txt"
+          grep -q "EXECUTION AUTHORITY: NOT GRANTED BY NAZEYATTA" "$EVIDENCE/safe-read-pass.txt"
+
+          nazeyatta check "$GITHUB_WORKSPACE/examples/safe-read.yaml" --json > "$EVIDENCE/safe-read-receipt.json"
+          python - "$EVIDENCE/safe-read-receipt.json" <<'PY'
+          import json, sys
+          p = sys.argv[1]
+          data = json.load(open(p, encoding="utf-8"))
+          assert data["evaluator_version"] == "0.1.0a2"
+          assert data["outcome"] == "PASS"
+          assert data["authority_granted"] is False
+          print("receipt_version=0.1.0a2")
+          PY
+
+          {
+            echo "candidate_source_commit=438b51403b059aa5ae1f9bf82a7a33609db4b18f"
+            echo "verification_commit=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+            echo "python=$(python --version 2>&1)"
+            echo "package_version=$(python -c 'from importlib.metadata import version; print(version("nazeyatta"))')"
+            echo "block_exit=$BLOCK_EXIT"
+            echo "pass_exit=$PASS_EXIT"
+            echo "external_onboarding_acceptance=PENDING"
+          } > "$EVIDENCE/verification-summary.txt"
+
+      - name: Upload verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-0.1.0a2-final-python-${{ matrix.python-version }}-evidence
+          path: release-evidence/python-${{ matrix.python-version }}/
+          if-no-files-found: error
+          retention-days: 7
