@@ -1,10 +1,8 @@
 # Changelog
 
-## Unreleased — 0.2.0a4 release candidate
+## 0.2.0a4 — 2026-09-25 — technical prerelease
 
-No `0.2.0a4` release has been published yet.
-
-Candidate delta since `0.2.0a3`:
+Changes since `0.2.0a3`:
 
 - add synthetic first-party GitHub Release and PyPI publication consumers that keep Human authority and publication permission explicit rather than inferring them from a PASS;
 - bind the exact release Task target descriptor through the consumer projection into the runtime target observation, and reject target-defining Task drift without promoting generic semantic-equivalence or freshness claims;
