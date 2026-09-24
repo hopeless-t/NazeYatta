@@ -172,6 +172,7 @@ jobs:
           Release Published != Production Adoption
           Exact Artifact Correlation != Freshness
 
+          External first-time Human onboarding acceptance remains PENDING under Issue #4.
           Publication of this release passed the configured GitHub Environment release gate.
           EOF
 
