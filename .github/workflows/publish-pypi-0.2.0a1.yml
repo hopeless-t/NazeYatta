@@ -134,12 +134,14 @@ jobs:
         run: |
           set -euo pipefail
           WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
+          HELPER="/tmp/live_release_closed_loop.py"
+          git show "$FINAL_COMMIT:tools/live_release_closed_loop.py" > "$HELPER"
 
           python -m venv .release-preflight
           .release-preflight/bin/python -m pip install --upgrade pip
           .release-preflight/bin/python -m pip install "pypi-dist/$WHEEL"
 
-          .release-preflight/bin/python tools/live_release_closed_loop.py preflight-task \
+          .release-preflight/bin/python "$HELPER" preflight-task \
             --version "$VERSION" \
             --final-commit "$FINAL_COMMIT" \
             --release-channel "$RELEASE_CHANNEL" \
@@ -154,7 +156,7 @@ jobs:
             --receipt-out evidence/live-preflight-receipt.json \
             --json > evidence/live-preflight-stdout.json
 
-          .release-preflight/bin/python tools/live_release_closed_loop.py verification-request \
+          .release-preflight/bin/python "$HELPER" verification-request \
             --task evidence/live-preflight-task.json \
             --receipt evidence/live-preflight-receipt.json \
             --out evidence/live-verification-request.json
@@ -230,12 +232,14 @@ jobs:
           set -euo pipefail
           WHEEL="nazeyatta-${VERSION}-py3-none-any.whl"
           SDIST="nazeyatta-${VERSION}.tar.gz"
+          HELPER="/tmp/live_release_closed_loop.py"
+          git show "$FINAL_COMMIT:tools/live_release_closed_loop.py" > "$HELPER"
 
           python -m venv .public-verify
           .public-verify/bin/python -m pip install --upgrade pip
           .public-verify/bin/python -m pip install "pypi-redownload/$WHEEL"
 
-          .public-verify/bin/python tools/live_release_closed_loop.py observation \
+          .public-verify/bin/python "$HELPER" observation \
             --request evidence/live-verification-request.json \
             --release-json evidence/release.json \
             --pypi-json evidence/pypi-after.json \
