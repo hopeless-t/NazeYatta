@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — 1.1 development
+
+- add the Human-approved Closed-loop Verification Kernel v0.1 scope;
+- add neutral `VerificationRequest`, `PostActionObservation`, and `VerificationReceipt` contracts;
+- add deterministic exact-fact outcomes `VERIFIED_SUCCESS / VERIFIED_FAILURE / UNKNOWN`;
+- preserve exact work identity bindings and fail invalid binding mismatches as input errors;
+- preserve `authority_granted=false` and `retry_authorized=false`;
+- add `nazeyatta verify REQUEST OBSERVATION` with JSON and no-clobber receipt output;
+- keep machine contracts neutral while projecting verification failures playfully in the human CLI;
+- add captured NazeYatta v1.0.0 release facts as the first concrete verification dogfood;
+- add V01-V20 coverage and built-wheel verification smoke.
+
+```text
+Cute Presentation != Weakened Semantics
+VerificationReceipt != Action Authority
+UNKNOWN != Permission To Retry
+Observed Mismatch != Root Cause Proven
+```
+
 ## 1.0.0 — 2026-09-25 — stable release
 
 NazeYatta 1.0 promotes the bounded command-line preflight core to the stable supported surface.
