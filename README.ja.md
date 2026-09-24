@@ -44,7 +44,7 @@ Python 3.11以上が必要です。
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a4"
+python -m pip install "nazeyatta==1.0.0"
 
 nazeyatta example publish-photo > task.yaml
 nazeyatta check task.yaml
@@ -108,7 +108,7 @@ NazeYatta自身は、実際の作業を行ったり、実行権限を発行し�
 
 NazeYattaの役割は、**渡されたルールと、今回の作業について確認できている情報を照らし合わせること**です。
 
-現在のalpha版は、
+stable CLI core版は、
 
 > **「この人・組織が本当にそのルールを決める権限を持っているか」まで自動で証明するものではありません。**
 
@@ -155,12 +155,12 @@ NazeYattaが役立つのは、複数のAIや自動化処理で、次のような
 
 Python 3.11以上が必要です。
 
-PyPIから `0.2.0a4` technical prerelease を入れ、同梱Exampleを取り出します。
+PyPIからstable版 `1.0.0` を入れ、同梱Exampleを取り出します。
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a4"
+python -m pip install "nazeyatta==1.0.0"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
@@ -403,7 +403,7 @@ fingerprintだけで「誰がその内容を作ったか」や「その内容が
 - 実際の作業そのものを実行する
 - 「この作業をしてよい」という実行権限を新しく作る
 - ルールを決めた人・組織が、本当にその権限を持っているかまで自動で証明する
-- BLOCKになった作業を、現在のalpha版だけで物理的に停止させる
+- BLOCKになった作業を、NazeYatta単体だけで物理的に停止させる
 
 つまり、
 
@@ -508,7 +508,7 @@ AI:
 
 なら、**その食い違いを作業前に見つけ、BLOCK（停止）などの判定につなげる**、というのが原点の発想です。
 
-現在のalpha版では、**AI自身に作業前KYを自動生成させるところから実行までを、一連の自律フローとして動かす機能**はまだ実装されていません。
+1.0 stable CLI coreでは、**AI自身に作業前KYを自動生成させるところから実行までを、一連の自律フローとして動かす機能**はstable CLIの保証範囲に含めていません。
 
 一方で、その原点に必要な機械的な部品は一段進みました。現在のRepositoryには、Workerから受け取ったKY申告を型付きデータとして扱い、独立した基準と決定論的に比較するKY Gate、PASS後のFresh Handoff、境界状態の変化を見てRe-KYを判断するcontractがあります。さらに、固定されたローカルfixtureをFresh Processで読み取るread-only dogfoodまで実装されています。
 
@@ -518,7 +518,7 @@ AI:
 AI自身がKYを自動生成して
 そのまま本番作業まで自律実行
 !=
-現在のalpha
+1.0 stable CLI core
 
 型付きKY申告
 -> 決定論的な照合
@@ -543,7 +543,7 @@ AI自身の発言
 
 自己申告だけで「安全」「確認済み」にはしません。
 
-### 現在のalpha版では
+### 1.0 stable CLI coreでは
 
 原点にある、
 
@@ -627,7 +627,7 @@ NazeYatta自身が本番のIAM・PKI・万能な権限管理システムにな�
 
 ## 現在の状態
 
-NazeYattaは、まだ**開発途中の実験版（alpha版）**です。
+NazeYatta `1.0` は、対応範囲を明示した **stableなコマンドラインpreflight checker** です。
 
 ### 現在できること
 

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version without the v prefix (for example 0.2.0a4)"
+        description: "Version without the v prefix (for example 1.0.0)"
         required: true
         type: string
       final_commit:

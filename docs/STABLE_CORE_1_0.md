@@ -17,7 +17,7 @@ nazeyatta example
 nazeyatta schema
 ```
 
-The stable core accepts bounded YAML Task input from a file or one UTF-8 stdin stream, evaluates the supplied task/evidence snapshot against the selected policy bundle, and emits a reproducible preflight result.
+The stable core accepts bounded YAML Task input from a file or one UTF-8 stdin stream, evaluates the supplied task/evidence snapshot against the selected policy bundle, emits a reproducible preflight result, and can emit a structured debrief template for a known rule id.
 
 ## Stable result semantics
 

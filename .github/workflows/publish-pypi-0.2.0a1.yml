@@ -11,6 +11,14 @@ on:
         description: "Exact source commit targeted by the GitHub Release"
         required: true
         type: string
+      release_channel:
+        description: "Expected GitHub Release channel"
+        required: true
+        type: choice
+        default: prerelease
+        options:
+          - prerelease
+          - stable
 
 permissions:
   contents: read
@@ -32,6 +40,7 @@ jobs:
       VERSION: ${{ inputs.version }}
       FINAL_COMMIT: ${{ inputs.final_commit }}
       TAG: v${{ inputs.version }}
+      RELEASE_CHANNEL: ${{ inputs.release_channel }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +65,19 @@ jobs:
           test "$SOURCE_VERSION" = "$VERSION"
           test "$TAG" = "v$SOURCE_VERSION"
 
+          case "$RELEASE_CHANNEL" in
+            stable)
+              [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+              ;;
+            prerelease)
+              [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+              ;;
+            *)
+              echo "unsupported release_channel: $RELEASE_CHANNEL" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Verify exact GitHub Release identity and distributions
         shell: bash
         run: |
@@ -66,8 +88,13 @@ jobs:
           jq -e --arg sha "$FINAL_COMMIT" '.object.sha == $sha' evidence/tag-ref.json
 
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > evidence/release.json
-          jq -e --arg tag "$TAG" --arg sha "$FINAL_COMMIT" \
-            '.tag_name == $tag and .prerelease == true and .target_commitish == $sha' \
+          if [ "$RELEASE_CHANNEL" = "stable" ]; then
+            EXPECTED_PRERELEASE=false
+          else
+            EXPECTED_PRERELEASE=true
+          fi
+          jq -e --arg tag "$TAG" --arg sha "$FINAL_COMMIT" --argjson prerelease "$EXPECTED_PRERELEASE" \
+            '.tag_name == $tag and .prerelease == $prerelease and .target_commitish == $sha' \
             evidence/release.json
 
           gh release download "$TAG" \
@@ -159,6 +186,7 @@ jobs:
             echo "trusted_publish_outcome=${{ steps.trusted_publish.outcome }}"
             echo "authentication_route=GitHub_OIDC_Trusted_Publishing"
             echo "environment=release"
+            echo "release_channel=$RELEASE_CHANNEL"
             echo "publication_performed=true"
           } > evidence/publication-route.txt
 

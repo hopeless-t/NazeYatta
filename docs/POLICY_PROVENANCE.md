@@ -1,6 +1,6 @@
 # Policy Provenance Contract
 
-Status: bounded 0.2.x policy provenance contract.
+Status: bounded policy provenance contract; outside the 1.0 stable CLI guarantee.
 
 A policy bundle fingerprint proves which parsed policy content was evaluated. It does not by itself
 say where that policy came from, who claims authority over it, or whether that authority is
@@ -93,7 +93,7 @@ The caller still decides which policy ref/source/scope it expects.
 
 ## Authority boundary
 
-Current alpha does not independently establish that:
+NazeYatta 1.0 does not independently establish that:
 
 - the claimed authority ref identifies a real authority;
 - that authority is entitled to set policy for the scope;
