@@ -97,12 +97,12 @@ Examples:
 
 Requires Python 3.11+.
 
-Install the `0.2.0a2` technical prerelease from PyPI and extract a packaged example:
+Install the `0.2.0a3` technical prerelease from PyPI and extract a packaged example:
 
 ~~~bash
 python -m venv .venv
 . .venv/bin/activate          # Windows: .venv\Scripts\activate
-python -m pip install "nazeyatta==0.2.0a2"
+python -m pip install "nazeyatta==0.2.0a3"
 
 nazeyatta --version
 nazeyatta example publish-photo > task.yaml
@@ -145,6 +145,24 @@ nazeyatta check safe-read.yaml
 ~~~
 
 That example returns PASS.
+
+The task input can also come from one bounded UTF-8 stdin stream:
+
+~~~bash
+nazeyatta example safe-read | nazeyatta check -
+~~~
+
+Here, `-` means Task YAML from stdin. It does not expand authority or change evaluation semantics, and `--policy -` is rejected so one stdin stream cannot ambiguously provide both Task and policy input.
+
+You can extract the exact packaged copies of the existing core schemas too:
+
+~~~bash
+nazeyatta schema task > task.schema.json
+nazeyatta schema evidence > evidence.schema.json
+nazeyatta schema receipt > receipt.schema.json
+~~~
+
+Schema extraction is a transport/convenience surface only. It does **not** grant execution authority or add new schema semantics.
 
 But:
 
