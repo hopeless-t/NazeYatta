@@ -1,0 +1,165 @@
+name: Live Release Observer 0.2.0a3
+
+on:
+  push:
+    branches:
+      - experiment/live-release-observer-0.2.0a3
+
+permissions:
+  contents: read
+
+env:
+  FINAL_MAIN: 29e6ae1b081c991d2e4817e4cdedb37304140948
+  TAG: v0.2.0a3
+  EXPECTED_COMMIT: 16b7b0ae5ba0c7e8dcd7e728dd6808a43c5095e8
+  WHEEL_NAME: nazeyatta-0.2.0a3-py3-none-any.whl
+  WHEEL_SHA256: 38662971bb43314d0df795d84c34e9f03d60cc69ac5b165596cc4e393c5c8242
+  SDIST_NAME: nazeyatta-0.2.0a3.tar.gz
+  SDIST_SHA256: 875b36fc4d5cfe90af49624d8236b383a9e1b7e85f30e30e541761095e2667be
+
+jobs:
+  observe:
+    name: GET-only GitHub Release target observation
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert workflow-only experiment branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$FINAL_MAIN" HEAD
+          CHANGED="$(git diff --name-only "$FINAL_MAIN"...HEAD)"
+          test "$CHANGED" = ".github/workflows/live-release-observer-0.2.0a3.yml" || {
+            echo "unexpected experiment-branch delta:"
+            printf '%s\n' "$CHANGED"
+            exit 1
+          }
+
+      - name: Checkout exact canonical main source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "$FINAL_MAIN"
+          test "$(git rev-parse HEAD)" = "$FINAL_MAIN"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install exact-main package for deterministic fingerprinting
+        run: python -m pip install -e .
+
+      - name: Observe published target with GET-only GitHub API
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+
+          gh api --method GET "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > evidence/tag-ref.json
+          gh api --method GET "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > evidence/release.json
+
+          jq -e --arg sha "$EXPECTED_COMMIT" '.object.type == "commit" and .object.sha == $sha' evidence/tag-ref.json
+          jq -e --arg tag "$TAG" --arg sha "$EXPECTED_COMMIT"             '.tag_name == $tag and .target_commitish == $sha and .prerelease == true and .draft == false'             evidence/release.json
+
+          jq -e --arg name "$WHEEL_NAME" --arg digest "sha256:$WHEEL_SHA256"             '.assets[] | select(.name == $name and .digest == $digest)'             evidence/release.json >/dev/null
+
+          jq -e --arg name "$SDIST_NAME" --arg digest "sha256:$SDIST_SHA256"             '.assets[] | select(.name == $name and .digest == $digest)'             evidence/release.json >/dev/null
+
+      - name: Build canonical observed descriptor and NazeYatta fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from nazeyatta.evaluator import load_yaml, stable_hash
+
+          root = Path.cwd()
+          evidence = root / "evidence"
+          tag_ref = json.loads((evidence / "tag-ref.json").read_text(encoding="utf-8"))
+          release = json.loads((evidence / "release.json").read_text(encoding="utf-8"))
+
+          wanted = {
+              os.environ["WHEEL_NAME"]: os.environ["WHEEL_SHA256"],
+              os.environ["SDIST_NAME"]: os.environ["SDIST_SHA256"],
+          }
+          live_assets = {
+              item["name"]: item["digest"].removeprefix("sha256:")
+              for item in release["assets"]
+              if item["name"] in wanted
+          }
+          assert live_assets == wanted
+
+          descriptor = {
+              "provider": "github",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "tag": release["tag_name"],
+              "final_commit": tag_ref["object"]["sha"],
+              "prerelease": release["prerelease"],
+              "artifacts": [
+                  {"filename": name, "sha256": live_assets[name]}
+                  for name in sorted(live_assets)
+              ],
+          }
+
+          fixture = load_yaml(root / "examples" / "release-github-publication-v02.synthetic.yaml")
+          fixture_descriptor = {
+              "provider": fixture["action"]["target"]["provider"],
+              "repository": fixture["action"]["target"]["repository"],
+              "tag": fixture["action"]["target"]["tag"],
+              "final_commit": fixture["action"]["target"]["final_commit"],
+              "prerelease": fixture["action"]["target"]["prerelease"],
+              "artifacts": sorted(
+                  [
+                      {"filename": item["filename"], "sha256": item["sha256"]}
+                      for item in fixture["data"]["artifacts"]
+                  ],
+                  key=lambda item: item["filename"],
+              ),
+          }
+          assert descriptor == fixture_descriptor
+
+          fingerprint = stable_hash(descriptor)
+          (evidence / "observed-target-descriptor.json").write_text(
+              json.dumps(descriptor, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (evidence / "target-fingerprint.txt").write_text(fingerprint + "\n", encoding="utf-8")
+
+          summary = {
+              "classification": "LIVE_GITHUB_RELEASE_TARGET_OBSERVATION",
+              "source_commit": os.environ["FINAL_MAIN"],
+              "provider": "github",
+              "api_access": "GET_ONLY",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "tag": os.environ["TAG"],
+              "release_id": release["id"],
+              "target_descriptor_matches_v02_consumer_fixture": True,
+              "target_fingerprint": fingerprint,
+              "external_target_write_performed": False,
+              "publication_performed": False,
+              "freshness_verified": False,
+              "authority_authenticated": False,
+              "authority_granted": False,
+          }
+          (evidence / "observer-summary.json").write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload read-only observation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazeyatta-live-release-observer-0.2.0a3
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
