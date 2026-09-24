@@ -37,6 +37,27 @@ NazeYattaは、**渡された作業内容と確認情報を、決められたル
 
 **作業前のチェックを行い、その結果を記録して返す道具**です。
 
+## 30秒で試す
+
+Python 3.11以上が必要です。
+
+~~~bash
+python -m venv .venv
+. .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install "nazeyatta==0.2.0a4"
+
+nazeyatta example publish-photo > task.yaml
+nazeyatta check task.yaml
+~~~
+
+期待される結果は **BLOCK（停止）** です。同梱Exampleでは、公開許可をわざと `UNKNOWN（不明・未確認）` にしてあります。
+
+これがNazeYattaの中心動作です。**必要な確認が取れていない時に、「たぶん大丈夫」へ勝手に読み替えません。**
+
+> **PASSは「渡された作業前チェックを通過した」という意味です。PASSそのものが実行権限を与えるわけではありません。**
+
+詳しい読み方は [まず1回だけ動かす](#まず1回だけ動かす) にあります。
+
 ---
 
 ## 30秒で掴む全体像
