@@ -1,10 +1,10 @@
-# Closed-loop Verification — NazeYatta 1.1 development
+# Closed-loop Verification — NazeYatta 1.1
 
-**Status:** 1.1 development / main branch only / not included in the published PyPI 1.0.0 package.
+**Status:** stable in NazeYatta 1.1.0.
 
 NazeYatta 1.0 checks before an action.
 
-The 1.1 development path closes one more small loop:
+NazeYatta 1.1 closes one more small loop:
 
 ```text
 Preflight
@@ -68,7 +68,7 @@ Worker Self-Report != Verified Evidence
 
 ## Command
 
-Development CLI:
+CLI:
 
 ```bash
 nazeyatta verify request.yaml observation.yaml
