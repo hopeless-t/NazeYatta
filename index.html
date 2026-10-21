@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NazeYatta</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span></div>
+      <div>
+        <div class="brand-name">NazeYatta</div>
+        <div class="brand-sub">Check with confidence.</div>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="メインナビゲーション">
+      <button class="nav-item active" data-view="home">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20H4z"/></svg>
+        ホーム
+      </button>
+      <button class="nav-item" data-view="new">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        新しく確認
+      </button>
+      <button class="nav-item" data-view="history">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4.8 6.6A8 8 0 1 1 4 12H1l4-4 4 4H6"/></svg>
+        履歴
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-dot"></div>
+      <span>利用できます</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">NAZEYATTA</p>
+        <h1 id="pageTitle">今日は何を確認しますか？</h1>
+      </div>
+      <button class="quiet-button" id="helpButton">使い方</button>
+    </header>
+
+    <section id="homeView" class="view active-view">
+      <div class="hero-card">
+        <div class="hero-copy">
+          <span class="hero-label">すぐに始められます</span>
+          <h2>やる前に確認。<br>やった後も確認。</h2>
+          <p>作業内容を入れるだけ。必要な確認をまとめて、次にやることを分かりやすく表示します。</p>
+          <button class="primary-button" id="heroStart">確認を始める</button>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="visual-ring ring-a"></div>
+          <div class="visual-ring ring-b"></div>
+          <div class="visual-check">✓</div>
+        </div>
+      </div>
+
+      <div class="section-heading">
+        <h2>最近の確認</h2>
+        <button class="text-button" data-view-jump="history">すべて見る</button>
+      </div>
+
+      <div class="recent-grid" id="recentGrid">
+        <article class="recent-card">
+          <div class="recent-top"><span class="state ready">準備OK</span><time>今日 18:42</time></div>
+          <h3>Webサイトを公開する</h3>
+          <p>必要な確認がそろっています。</p>
+          <div class="recent-meta">3項目を確認</div>
+        </article>
+        <article class="recent-card">
+          <div class="recent-top"><span class="state attention">確認が必要</span><time>今日 15:16</time></div>
+          <h3>報告書を送る</h3>
+          <p>送信先をもう一度確認してください。</p>
+          <div class="recent-meta">1項目を確認してください</div>
+        </article>
+        <article class="recent-card">
+          <div class="recent-top"><span class="state done">完了</span><time>昨日 22:03</time></div>
+          <h3>バックアップを作る</h3>
+          <p>期待した結果を確認できました。</p>
+          <div class="recent-meta">確認済み</div>
+        </article>
+      </div>
+    </section>
+
+    <section id="newView" class="view">
+      <div class="workflow-card">
+        <div class="stepper" aria-label="進行状況">
+          <div class="step active"><span>1</span><b>やること</b></div>
+          <div class="step-line"></div>
+          <div class="step"><span>2</span><b>確認</b></div>
+          <div class="step-line"></div>
+          <div class="step"><span>3</span><b>結果</b></div>
+        </div>
+
+        <div id="stepOne" class="workflow-step active-step">
+          <p class="question-label">何をしようとしていますか？</p>
+          <textarea id="taskInput" placeholder="例：お客様へ作業報告書を送る"></textarea>
+
+          <div class="quick-row">
+            <button class="quick-chip" data-task="Webサイトを公開する">Webサイトを公開</button>
+            <button class="quick-chip" data-task="お客様へ報告書を送る">報告書を送る</button>
+            <button class="quick-chip" data-task="バックアップを作る">バックアップ</button>
+          </div>
+
+          <div class="field-group">
+            <label for="targetInput">対象 <span>任意</span></label>
+            <input id="targetInput" placeholder="例：catnood.com / 〇〇社 / project-a">
+          </div>
+
+          <button class="primary-button wide" id="checkButton">この内容を確認</button>
+        </div>
+
+        <div id="stepTwo" class="workflow-step">
+          <div id="resultPanel" class="result-panel ready-panel">
+            <div class="result-icon">✓</div>
+            <div>
+              <div class="result-kicker">確認結果</div>
+              <h2 id="resultTitle">準備OK</h2>
+              <p id="resultMessage">このまま進められます。</p>
+            </div>
+          </div>
+
+          <div class="check-list" id="checkList"></div>
+
+          <div class="action-row">
+            <button class="secondary-button" id="backButton">内容を直す</button>
+            <button class="primary-button" id="continueButton">進める</button>
+          </div>
+        </div>
+
+        <div id="stepThree" class="workflow-step">
+          <p class="question-label">作業はどうなりましたか？</p>
+          <div class="outcome-grid">
+            <button class="outcome-card" data-outcome="done">
+              <span class="outcome-icon success">✓</span>
+              <b>予定どおり完了</b>
+              <small>期待した結果になった</small>
+            </button>
+            <button class="outcome-card" data-outcome="issue">
+              <span class="outcome-icon issue">!</span>
+              <b>気になる点がある</b>
+              <small>一部を確認したい</small>
+            </button>
+            <button class="outcome-card" data-outcome="unknown">
+              <span class="outcome-icon unknown">?</span>
+              <b>まだ分からない</b>
+              <small>結果を確認できていない</small>
+            </button>
+          </div>
+          <div id="finalMessage" class="final-message hidden"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="historyView" class="view">
+      <div class="history-card">
+        <div class="history-header">
+          <div>
+            <h2>履歴</h2>
+            <p>最近確認した内容を振り返れます。</p>
+          </div>
+          <input id="historySearch" type="search" placeholder="検索">
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="helpDialog">
+  <button class="dialog-close" id="closeHelp" aria-label="閉じる">×</button>
+  <p class="eyebrow">HOW TO USE</p>
+  <h2>3ステップだけです。</h2>
+  <ol>
+    <li><b>やることを書く</b><span>これから何をするのか入力します。</span></li>
+    <li><b>表示された内容を確認</b><span>問題なければそのまま進めます。</span></li>
+    <li><b>終わったら結果を選ぶ</b><span>予定どおりだったか確認します。</span></li>
+  </ol>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
